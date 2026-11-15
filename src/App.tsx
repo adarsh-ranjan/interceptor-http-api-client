@@ -209,6 +209,43 @@ export const App: React.FC = () => {
   const [isCodeModalOpen, setIsCodeModalOpen] = useState(false);
   const [collectionToRun, setCollectionToRun] = useState<Collection | null>(null);
 
+  // Window Maximized / Fullscreen State
+  const [isMaximized, setIsMaximized] = useState(false);
+
+  useEffect(() => {
+    // Check initial state from Electron
+    if (window.interceptor?.isMaximized) {
+      window.interceptor.isMaximized().then(setIsMaximized);
+    }
+
+    // Subscribe to IPC window state updates
+    let unsubscribe: (() => void) | undefined;
+    if (window.interceptor?.onWindowStateChange) {
+      unsubscribe = window.interceptor.onWindowStateChange((maximized) => {
+        setIsMaximized(maximized);
+      });
+    }
+
+    // Native resize listener for window maximize / fullscreen
+    const handleResize = () => {
+      if (window.interceptor?.isMaximized) {
+        window.interceptor.isMaximized().then(setIsMaximized);
+      } else {
+        const isMax =
+          Boolean(document.fullscreenElement) ||
+          (window.innerWidth >= window.screen.availWidth - 10 &&
+            window.innerHeight >= window.screen.availHeight - 30);
+        setIsMaximized(isMax);
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => {
+      if (unsubscribe) unsubscribe();
+      window.removeEventListener('resize', handleResize);
+    };
+  }, []);
+
   // Environments State with Persistence
   const [environments, setEnvironments] = useState<Environment[]>(() => {
     try {
@@ -1093,12 +1130,14 @@ export const App: React.FC = () => {
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-[#0d1117] text-[#e6edf3]">
       {/* Top Window Titlebar Header (Spans full window width, accommodates macOS traffic lights) */}
       <header
-        className="h-10 bg-[#0d1117] border-b border-[#30363d] flex items-center justify-between px-3 select-none shrink-0"
+        className="relative h-10 bg-[#0d1117] border-b border-[#30363d] flex items-center justify-between px-3 select-none shrink-0"
         style={{ WebkitAppRegion: 'drag' } as any}
       >
-        {/* Left Side: 80px clearance for macOS traffic lights + Interceptor branding */}
+        {/* Left Side: App title branding (aligns left with pl-2 when maximized, pl-20 in windowed mode for traffic lights) */}
         <div
-          className="flex items-center gap-2.5 pl-20"
+          className={`flex items-center gap-2.5 transition-all duration-150 ${
+            isMaximized ? 'pl-2' : 'pl-20'
+          }`}
           style={{ WebkitAppRegion: 'no-drag' } as any}
         >
           <div className="flex items-center gap-1.5">
@@ -1110,9 +1149,11 @@ export const App: React.FC = () => {
           </div>
         </div>
 
-        {/* Center: Window Title info */}
-        <div className="text-[11px] font-medium text-slate-400 hidden md:flex items-center gap-2">
-          <span>HTTP & WebSocket Client Workbench</span>
+        {/* Center: Always in the true horizontal center of the window titlebar */}
+        <div className="absolute left-1/2 -translate-x-1/2 pointer-events-none hidden md:flex items-center gap-2">
+          <span className="text-[11px] font-medium text-slate-400">
+            HTTP & WebSocket Client Workbench
+          </span>
         </div>
 
         {/* Right Side: Environment Selector & Shortcuts */}

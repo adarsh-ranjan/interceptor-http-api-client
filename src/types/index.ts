@@ -177,6 +177,8 @@ declare global {
   interface Window {
     interceptor?: {
       platform: string;
+      isMaximized?: () => Promise<boolean>;
+      onWindowStateChange?: (callback: (isMaximized: boolean) => void) => () => void;
       sendRequest: (options: {
         id?: string;
         method: string;

@@ -35,6 +35,18 @@ export interface FileDialogResult {
 
 const api = {
   platform: process.platform,
+  isMaximized: (): Promise<boolean> => {
+    return ipcRenderer.invoke('window:isMaximized');
+  },
+  onWindowStateChange: (callback: (isMaximized: boolean) => void) => {
+    const handler = (_event: any, state: { isMaximized: boolean }) => {
+      callback(state.isMaximized);
+    };
+    ipcRenderer.on('window:state-changed', handler);
+    return () => {
+      ipcRenderer.removeListener('window:state-changed', handler);
+    };
+  },
   sendRequest: (options: HttpRequestOptions): Promise<HttpResponseData> => {
     return ipcRenderer.invoke('http:execute', options);
   },

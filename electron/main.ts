@@ -25,6 +25,18 @@ function createWindow() {
     },
   });
 
+  const sendWindowState = () => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    const isMax = mainWindow.isMaximized() || mainWindow.isFullScreen();
+    mainWindow.webContents.send('window:state-changed', { isMaximized: isMax });
+  };
+
+  mainWindow.on('maximize', sendWindowState);
+  mainWindow.on('unmaximize', sendWindowState);
+  mainWindow.on('enter-full-screen', sendWindowState);
+  mainWindow.on('leave-full-screen', sendWindowState);
+  mainWindow.on('resize', sendWindowState);
+
   if (isDev) {
     const loadDevServer = () => {
       mainWindow?.loadURL('http://localhost:5173').catch(() => {
@@ -53,6 +65,12 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
   }
+});
+
+// IPC: Window State
+ipcMain.handle('window:isMaximized', () => {
+  if (!mainWindow || mainWindow.isDestroyed()) return false;
+  return mainWindow.isMaximized() || mainWindow.isFullScreen();
 });
 
 // IPC: HTTP Request Execution with Rich Payload Support
