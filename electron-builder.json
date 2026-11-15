@@ -1,6 +1,7 @@
 {
   "appId": "com.interceptor.app",
   "productName": "Interceptor",
+  "publish": "never",
   "directories": {
     "output": "release"
   },
@@ -56,6 +57,7 @@
     "shortcutName": "Interceptor"
   },
   "linux": {
+    "maintainer": "Adarsh Ranjan <49054080+adarsh-ranjan@users.noreply.github.com>",
     "target": [
       {
         "target": "AppImage",
