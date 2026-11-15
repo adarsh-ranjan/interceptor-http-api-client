@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { HttpResponse } from '../types';
 import { formatBytes, formatDuration, getStatusColor } from '../utils/http';
+import { JsonSyntaxViewer } from './JsonSyntaxViewer';
 import {
   Copy,
   Check,
@@ -20,20 +21,103 @@ interface ResponseViewerProps {
   activeUrl?: string;
 }
 
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error?: Error;
+}
+
+class JsonErrorBoundary extends React.Component<
+  { children: React.ReactNode; fallbackRaw?: string },
+  ErrorBoundaryState
+> {
+  constructor(props: { children: React.ReactNode; fallbackRaw?: string }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, info: any) {
+    console.error('[JsonSyntaxViewer Error]', error, info);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex-1 overflow-auto p-3 bg-[#0d1117]">
+          <div className="text-[11px] text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1.5 rounded mb-2 flex items-center justify-between">
+            <span>Syntax highlighting encountered an issue. Rendering plain formatted view.</span>
+            <button
+              type="button"
+              onClick={() => this.setState({ hasError: false })}
+              className="text-amber-300 underline text-[10px] cursor-pointer"
+            >
+              Retry
+            </button>
+          </div>
+          <pre className="font-mono text-xs leading-relaxed text-slate-200 whitespace-pre-wrap select-text">
+            {this.props.fallbackRaw || 'Empty response'}
+          </pre>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export const ResponseViewer: React.FC<ResponseViewerProps> = ({
   response,
   isLoading,
   activeUrl,
 }) => {
-  const [viewTab, setViewTab] = useState<'pretty' | 'raw' | 'headers' | 'tests'>('pretty');
+  const [viewTab, setViewTab] = useState<'pretty' | 'raw' | 'preview' | 'headers' | 'tests'>('pretty');
   const [headerFilter, setHeaderFilter] = useState('');
   const [copied, setCopied] = useState(false);
 
+  // React Rules of Hooks: Must define hooks at top-level before any conditional early returns
+  const isJson = useMemo(() => {
+    if (!response) return false;
+    if (response.isJson) return true;
+    if (response.contentType?.toLowerCase().includes('application/json')) return true;
+    if (response.rawBody) {
+      const trimmed = response.rawBody.trim();
+      if (
+        (trimmed.startsWith('{') && trimmed.endsWith('}')) ||
+        (trimmed.startsWith('[') && trimmed.endsWith(']'))
+      ) {
+        try {
+          JSON.parse(trimmed);
+          return true;
+        } catch {
+          return false;
+        }
+      }
+    }
+    return false;
+  }, [response]);
+
+  const isHtml = useMemo(() => {
+    if (!response) return false;
+    if (response.contentType?.toLowerCase().includes('text/html')) return true;
+    if (response.rawBody) {
+      const lower = response.rawBody.trim().toLowerCase();
+      return lower.startsWith('<!doctype html') || lower.startsWith('<html');
+    }
+    return false;
+  }, [response]);
+
   const handleCopy = () => {
     if (!response) return;
-    const content = response.isJson
-      ? JSON.stringify(response.data, null, 2)
-      : response.rawBody;
+    let content = response.rawBody || '';
+    if (response.isJson && response.data !== undefined) {
+      try {
+        content = JSON.stringify(response.data, null, 2);
+      } catch {
+        content = response.rawBody || '';
+      }
+    }
     navigator.clipboard.writeText(content);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -41,9 +125,14 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({
 
   const handleSaveResponse = async () => {
     if (!response) return;
-    const content = response.isJson
-      ? JSON.stringify(response.data, null, 2)
-      : response.rawBody;
+    let content = response.rawBody || '';
+    if (response.isJson && response.data !== undefined) {
+      try {
+        content = JSON.stringify(response.data, null, 2);
+      } catch {
+        content = response.rawBody || '';
+      }
+    }
     const ext = response.isJson ? 'json' : 'txt';
     const fileName = `response_${Date.now()}.${ext}`;
 
@@ -163,7 +252,7 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({
       </div>
 
       {/* Tabs Bar */}
-      <div className="flex items-center justify-between px-3 border-b border-[#30363d] bg-[#161b22]/50">
+      <div className="flex items-center justify-between px-3 border-b border-[#30363d] bg-[#161b22]/50 select-none">
         <div className="flex items-center">
           <button
             onClick={() => setViewTab('pretty')}
@@ -173,7 +262,7 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({
                 : 'border-transparent text-slate-400 hover:text-slate-200'
             }`}
           >
-            Pretty {response.isJson ? '(JSON)' : ''}
+            Pretty {isJson ? '(JSON)' : ''}
           </button>
           <button
             onClick={() => setViewTab('raw')}
@@ -185,6 +274,20 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({
           >
             Raw
           </button>
+
+          {isHtml && (
+            <button
+              onClick={() => setViewTab('preview')}
+              className={`px-3 py-1.5 font-medium border-b-2 transition-colors ${
+                viewTab === 'preview'
+                  ? 'border-sky-500 text-sky-400'
+                  : 'border-transparent text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              Preview (HTML)
+            </button>
+          )}
+
           <button
             onClick={() => setViewTab('headers')}
             className={`px-3 py-1.5 font-medium border-b-2 transition-colors ${
@@ -221,36 +324,60 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({
 
         {viewTab === 'headers' && (
           <div className="relative flex items-center py-1">
-            <Search className="w-3 h-3 absolute left-2 text-slate-500" />
+            <Search className="w-3 h-3 absolute left-2 text-slate-500 pointer-events-none" />
             <input
               type="text"
               placeholder="Filter headers..."
               value={headerFilter}
               onChange={(e) => setHeaderFilter(e.target.value)}
-              className="bg-[#0d1117] border border-[#30363d] rounded pl-6 pr-2 py-0.5 text-[11px] text-slate-200 focus:outline-none focus:border-sky-500 w-36"
+              className="bg-[#0d1117] border border-[#30363d] rounded pl-6 pr-2 py-0.5 text-[11px] text-slate-200 focus:outline-none focus:border-sky-500 w-36 font-sans"
             />
           </div>
         )}
       </div>
 
       {/* Response Tab Content */}
-      <div className="flex-1 overflow-auto p-3">
+      <div className="flex-1 overflow-hidden flex flex-col">
         {viewTab === 'pretty' && (
-          <pre className="font-mono text-xs leading-relaxed text-slate-200 whitespace-pre-wrap select-text selection:bg-sky-500/30">
-            {response.isJson
-              ? JSON.stringify(response.data, null, 2)
-              : response.rawBody || <span className="text-slate-500">Empty response body</span>}
-          </pre>
+          isJson ? (
+            <JsonErrorBoundary fallbackRaw={response.rawBody}>
+              <JsonSyntaxViewer
+                data={response.data}
+                rawText={response.rawBody}
+                onCopy={handleCopy}
+              />
+            </JsonErrorBoundary>
+          ) : (
+            <div className="flex-1 overflow-auto p-3">
+              <pre className="font-mono text-xs leading-relaxed text-slate-200 whitespace-pre-wrap select-text selection:bg-sky-500/30">
+                {response.rawBody || <span className="text-slate-500">Empty response body</span>}
+              </pre>
+            </div>
+          )
         )}
 
         {viewTab === 'raw' && (
-          <pre className="font-mono text-xs leading-relaxed text-slate-300 whitespace-pre-wrap select-text selection:bg-sky-500/30">
-            {response.rawBody || <span className="text-slate-500">Empty response body</span>}
-          </pre>
+          <div className="flex-1 overflow-auto p-3">
+            <pre className="font-mono text-xs leading-relaxed text-slate-300 whitespace-pre-wrap select-text selection:bg-sky-500/30">
+              {response.rawBody || <span className="text-slate-500">Empty response body</span>}
+            </pre>
+          </div>
+        )}
+
+        {viewTab === 'preview' && (
+          <div className="flex-1 bg-white p-2 overflow-hidden">
+            <iframe
+              title="HTML Preview"
+              srcDoc={response.rawBody}
+              sandbox="allow-same-origin"
+              className="w-full h-full border-0 rounded"
+            />
+          </div>
         )}
 
         {viewTab === 'headers' && (
-          <div className="border border-[#30363d] rounded-md overflow-hidden">
+          <div className="flex-1 overflow-auto p-3">
+            <div className="border border-[#30363d] rounded-md overflow-hidden">
             <table className="w-full text-left font-mono text-[11px]">
               <thead className="bg-[#161b22] text-slate-400 border-b border-[#30363d]">
                 <tr>
@@ -280,9 +407,11 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({
               </tbody>
             </table>
           </div>
-        )}
+        </div>
+      )}
 
-        {viewTab === 'tests' && (
+      {viewTab === 'tests' && (
+        <div className="flex-1 overflow-auto p-3">
           <div className="space-y-2">
             <div className="flex items-center justify-between pb-2 border-b border-[#30363d]/50">
               <span className="font-semibold text-slate-300">
@@ -319,7 +448,8 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({
               </div>
             ))}
           </div>
-        )}
+        </div>
+      )}
       </div>
     </div>
   );

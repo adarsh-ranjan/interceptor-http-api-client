@@ -1,16 +1,14 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { BodyType, FormDataItem, KeyValuePair } from '../types';
 import {
-  Sparkles,
-  Trash2,
-  CheckCircle2,
-  AlertCircle,
   FileUp,
   Plus,
   CheckSquare,
   Square,
   FileCode,
+  Trash2,
 } from 'lucide-react';
+import { JsonBodyEditor } from './JsonBodyEditor';
 
 interface BodyEditorProps {
   bodyType: BodyType;
@@ -39,21 +37,6 @@ export const BodyEditor: React.FC<BodyEditorProps> = ({
   binaryFileName,
   onBinaryFileChange,
 }) => {
-  const [formatStatus, setFormatStatus] = useState<string | null>(null);
-
-  const handleFormatJson = () => {
-    if (!bodyContent.trim()) return;
-    try {
-      const parsed = JSON.parse(bodyContent);
-      onBodyContentChange(JSON.stringify(parsed, null, 2));
-      setFormatStatus('Formatted');
-      setTimeout(() => setFormatStatus(null), 2000);
-    } catch (e: any) {
-      setFormatStatus(`Invalid JSON: ${e.message}`);
-      setTimeout(() => setFormatStatus(null), 3500);
-    }
-  };
-
   // Form-Data item actions
   const handleAddFormData = () => {
     const newItem: FormDataItem = {
@@ -155,35 +138,6 @@ export const BodyEditor: React.FC<BodyEditorProps> = ({
             </label>
           ))}
         </div>
-
-        {/* JSON / Text formatting helpers */}
-        {bodyType === 'json' && (
-          <div className="flex items-center gap-2">
-            {formatStatus && (
-              <span
-                className={`flex items-center gap-1 ${
-                  formatStatus.startsWith('Invalid') ? 'text-rose-400' : 'text-emerald-400'
-                }`}
-              >
-                {formatStatus.startsWith('Invalid') ? (
-                  <AlertCircle className="w-3.5 h-3.5" />
-                ) : (
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                )}
-                {formatStatus}
-              </span>
-            )}
-            <button
-              type="button"
-              onClick={handleFormatJson}
-              className="flex items-center gap-1 text-sky-400 hover:text-sky-300 font-medium px-2 py-0.5 rounded hover:bg-sky-500/10"
-              title="Prettify JSON indentation"
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>Prettify</span>
-            </button>
-          </div>
-        )}
       </div>
 
       {/* Body Content Area */}
@@ -201,16 +155,21 @@ export const BodyEditor: React.FC<BodyEditorProps> = ({
           </div>
         )}
 
-        {/* JSON & RAW TEXT */}
-        {(bodyType === 'json' || bodyType === 'text') && (
+        {/* JSON BODY EDITOR (Postman-style) */}
+        {bodyType === 'json' && (
+          <JsonBodyEditor
+            value={bodyContent}
+            onChange={onBodyContentChange}
+            placeholder={'{\n  "title": "New Post",\n  "userId": 1\n}'}
+          />
+        )}
+
+        {/* RAW TEXT */}
+        {bodyType === 'text' && (
           <textarea
             value={bodyContent}
             onChange={(e) => onBodyContentChange(e.target.value)}
-            placeholder={
-              bodyType === 'json'
-                ? '{\n  "title": "New Post",\n  "userId": 1\n}'
-                : 'Enter raw text payload...'
-            }
+            placeholder="Enter raw text payload..."
             spellCheck={false}
             className="w-full h-full p-3 font-mono text-xs bg-transparent text-slate-200 resize-none focus:outline-none leading-relaxed"
           />
