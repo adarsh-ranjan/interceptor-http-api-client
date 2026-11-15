@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Collection, CollectionItem, HttpRequest } from '../types';
+import { Collection, CollectionItem, HttpRequest, Environment } from '../types';
 import { getMethodColor } from '../utils/http';
 import { exportToPostman, exportToInterceptor, parseCollectionFile } from '../utils/postman';
 import {
@@ -26,6 +26,8 @@ interface CollectionsViewProps {
   onUpdateCollections: (collections: Collection[]) => void;
   onNewRequestInCollection: (collectionId: string, folderId?: string) => void;
   onRunCollection: (collection: Collection) => void;
+  environments?: Environment[];
+  activeEnvId?: string | null;
 }
 
 export const CollectionsView: React.FC<CollectionsViewProps> = ({
@@ -34,6 +36,8 @@ export const CollectionsView: React.FC<CollectionsViewProps> = ({
   onUpdateCollections,
   onNewRequestInCollection,
   onRunCollection,
+  environments,
+  activeEnvId,
 }) => {
   const [openFolders, setOpenFolders] = useState<Record<string, boolean>>({});
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -138,8 +142,23 @@ export const CollectionsView: React.FC<CollectionsViewProps> = ({
   };
 
   const handleExport = async (col: Collection, format: 'postman' | 'interceptor') => {
-    const content = format === 'postman' ? exportToPostman(col) : exportToInterceptor(col);
-    const fileName = `${col.name.toLowerCase().replace(/[^a-z0-9]/g, '_')}_${format}.json`;
+    let content: string;
+    let fileName: string;
+
+    if (format === 'postman') {
+      const activeEnv = (environments || []).find((e) => e.id === activeEnvId);
+      const envVarsRecord: Record<string, string> = {};
+      if (activeEnv) {
+        activeEnv.variables.forEach((v) => {
+          if (v.enabled) envVarsRecord[v.key] = v.value;
+        });
+      }
+      content = exportToPostman(col, envVarsRecord);
+      fileName = `${col.name.toLowerCase().replace(/[^a-z0-9]/g, '_')}.postman_collection.json`;
+    } else {
+      content = exportToInterceptor(col);
+      fileName = `${col.name.toLowerCase().replace(/[^a-z0-9]/g, '_')}_interceptor.json`;
+    }
 
     if (window.interceptor?.saveFileDialog) {
       await window.interceptor.saveFileDialog({

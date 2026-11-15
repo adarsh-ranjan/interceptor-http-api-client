@@ -17,6 +17,7 @@ A modern, lightning-fast, cross-platform desktop API client (Postman alternative
 - [⌨️ Keyboard Shortcuts](#️-keyboard-shortcuts)
 - [🛠️ Architecture](#️-architecture)
 - [🚀 Getting Started](#-getting-started)
+- [📦 Packaging & Distribution](#-packaging--cross-platform-distribution)
 - [🗺️ Project Roadmap](#️-project-roadmap)
 
 ---
@@ -202,6 +203,40 @@ npm run dev
 npm run build
 npm start
 ```
+
+---
+
+## 📦 Packaging & Cross-Platform Distribution
+
+Interceptor uses **`electron-builder`** to produce production-grade standalone executables and installers for **macOS**, **Windows**, and **Linux**.
+
+### Local Builds
+```bash
+# Build for macOS (.dmg installer and .zip)
+npm run dist:mac
+
+# Build for Windows (.exe NSIS installer and portable)
+npm run dist:win
+
+# Build for Linux (.AppImage and .deb package)
+npm run dist:linux
+
+# Build all targets configured for the current platform
+npm run dist:all
+```
+All generated installers and binaries are output to the `release/` directory.
+
+### Automated Multi-Platform CI/CD (GitHub Actions)
+A pre-configured GitHub Actions workflow ([`.github/workflows/build.yml`](./.github/workflows/build.yml)) builds native binaries for macOS, Windows, and Linux in parallel:
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+This triggers parallel builds across:
+- **`macos-latest`**: Generates `.dmg` and `.zip`
+- **`windows-latest`**: Generates `.exe` installer and portable executable
+- **`ubuntu-latest`**: Generates `.AppImage` and `.deb`
+- Automatically attaches all 5 distributable binaries directly to your GitHub Releases page!
 
 ---
 

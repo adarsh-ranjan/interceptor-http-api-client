@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { HistoryItem, HttpRequest, Collection } from '../types';
+import { HistoryItem, HttpRequest, Collection, Environment } from '../types';
 import { CollectionsView } from './CollectionsView';
 import { getMethodColor, getStatusColor } from '../utils/http';
 import { History, FolderTree, Trash2, ChevronLeft, ChevronRight, Zap } from 'lucide-react';
@@ -14,6 +14,8 @@ interface SidebarProps {
   onRunCollection: (collection: Collection) => void;
   isCollapsed: boolean;
   onToggleCollapse: () => void;
+  environments?: Environment[];
+  activeEnvId?: string | null;
 }
 
 const PRESETS: { name: string; request: HttpRequest }[] = [
@@ -78,6 +80,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onRunCollection,
   isCollapsed,
   onToggleCollapse,
+  environments,
+  activeEnvId,
 }) => {
   const [activeTab, setActiveTab] = useState<'collections' | 'history'>('collections');
 
@@ -164,6 +168,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
             onUpdateCollections={onUpdateCollections}
             onNewRequestInCollection={onNewRequestInCollection}
             onRunCollection={onRunCollection}
+            environments={environments}
+            activeEnvId={activeEnvId}
           />
         ) : (
           <div className="flex-1 overflow-y-auto divide-y divide-[#30363d]/50 p-2">

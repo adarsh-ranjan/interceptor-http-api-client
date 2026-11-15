@@ -1187,6 +1187,8 @@ export const App: React.FC = () => {
           onRunCollection={(col) => setCollectionToRun(col)}
           isCollapsed={isSidebarCollapsed}
           onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+          environments={environments}
+          activeEnvId={activeEnvId}
         />
 
         {/* Main Workspace */}

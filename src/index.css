@@ -16,6 +16,41 @@
     overflow: hidden;
   }
 
+  /* All clickable elements should display hand pointer on hover */
+  button,
+  a,
+  select,
+  summary,
+  input[type="button"],
+  input[type="submit"],
+  input[type="reset"],
+  input[type="checkbox"],
+  input[type="radio"],
+  input[type="file"]::-webkit-file-upload-button,
+  [role="button"],
+  [role="tab"],
+  [role="menuitem"],
+  [role="option"],
+  [role="checkbox"],
+  [role="switch"],
+  [role="link"],
+  label,
+  .cursor-pointer,
+  [onclick] {
+    cursor: pointer;
+  }
+
+  /* Disabled elements should display not-allowed cursor */
+  button:disabled,
+  input:disabled,
+  select:disabled,
+  textarea:disabled,
+  [disabled],
+  [aria-disabled="true"],
+  .cursor-not-allowed {
+    cursor: not-allowed !important;
+  }
+
   /* Custom scrollbars */
   ::-webkit-scrollbar {
     width: 6px;
