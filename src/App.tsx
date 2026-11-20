@@ -1256,6 +1256,7 @@ export const App: React.FC = () => {
           onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
           environments={environments}
           activeEnvId={activeEnvId}
+          activeItemId={activeTab.protocol === 'http' ? activeTab.request.itemId || activeTab.request.id : undefined}
         />
 
         {/* Main Workspace */}

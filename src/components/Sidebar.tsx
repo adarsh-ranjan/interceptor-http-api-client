@@ -16,6 +16,7 @@ interface SidebarProps {
   onToggleCollapse: () => void;
   environments?: Environment[];
   activeEnvId?: string | null;
+  activeItemId?: string | null;
 }
 
 const PRESETS: { name: string; request: HttpRequest }[] = [
@@ -82,6 +83,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onToggleCollapse,
   environments,
   activeEnvId,
+  activeItemId,
 }) => {
   const [activeTab, setActiveTab] = useState<'collections' | 'history'>('collections');
 
@@ -170,6 +172,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             onRunCollection={onRunCollection}
             environments={environments}
             activeEnvId={activeEnvId}
+            activeItemId={activeItemId}
           />
         ) : (
           <div className="flex-1 overflow-y-auto divide-y divide-[#30363d]/50 p-2">

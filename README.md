@@ -50,11 +50,21 @@ A modern, lightning-fast, cross-platform desktop API client (Postman alternative
 ---
 
 ### Phase 2: Collections & Postman Migration
+- **Postman-Inspired Redesigned Collection Tree**:
+  - **Minimalist Typography-First Tree**: Clean, distraction-free hierarchy without cluttering folder/document icons; uses subtle disclosure chevrons and Postman-style method badges.
+  - **Single Row Action ("Add")**: Only the primary `+` (Add Request) action and a `...` (Three-dot options) trigger are visible on hover, keeping rows clean and readable.
+  - **Floating Three-Dot Context Menu**:
+    - Complete action suite for Collections (`Add Request`, `Add Folder`, `Run Collection`, `Rename`, `Export Postman v2.1`, `Export Interceptor`, `Delete Collection`).
+    - Action suite for Folders (`Add Request`, `Add Subfolder`, `Rename`, `Delete Folder`).
+    - Action suite for Requests (`Duplicate Request`, `Rename`, `Delete Request`).
+    - **Click-Outside & Escape Dismissal**: Smooth backdrop-aware portal menu that immediately closes on any outside click, on `Escape` key, or when scrolling.
+  - **Fast Tree Filter / Search**: Live instant search across collections, folders, and request names with auto-expansion of matching branches.
+  - **Active Request Highlighting**: Highlights the currently open request in the collection tree with subtle border and theme accents.
 - **Hierarchical Collections & Folders**: Organize APIs into collections and sub-folders with custom descriptions.
 - **Collection Management & Safe Deletion**:
   - One-click deletion with a safe in-app confirmation modal (prevents accidental loss of requests).
   - Individual folder and request deletion with confirmation modals.
-  - In-place renaming for collections, folders, and requests.
+  - In-place renaming with `Enter` / `Escape` keyboard shortcuts.
 - **Postman v2.1 Import & Export**:
   - One-click import for existing Postman Collections (`.json` v2.0 and v2.1 schemas).
   - Export collections directly to official Postman v2.1 schema or Interceptor JSON format.
