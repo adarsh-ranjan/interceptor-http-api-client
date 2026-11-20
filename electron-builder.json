@@ -1,7 +1,6 @@
 {
   "appId": "com.interceptor.app",
   "productName": "Interceptor",
-  "publish": "never",
   "directories": {
     "output": "release"
   },
