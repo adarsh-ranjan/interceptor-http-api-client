@@ -1,6 +1,7 @@
 import React from 'react';
-import { KeyValuePair } from '../types';
+import { KeyValuePair, Environment } from '../types';
 import { Plus, Trash2, CheckSquare, Square } from 'lucide-react';
+import { VariableInput } from './VariableInput';
 
 interface KeyValueEditorProps {
   items: KeyValuePair[];
@@ -8,6 +9,9 @@ interface KeyValueEditorProps {
   keyPlaceholder?: string;
   valuePlaceholder?: string;
   descriptionPlaceholder?: string;
+  activeEnvironment?: Environment;
+  environments?: Environment[];
+  onOpenEnvironmentModal?: () => void;
 }
 
 export const KeyValueEditor: React.FC<KeyValueEditorProps> = ({
@@ -16,6 +20,9 @@ export const KeyValueEditor: React.FC<KeyValueEditorProps> = ({
   keyPlaceholder = 'Key',
   valuePlaceholder = 'Value',
   descriptionPlaceholder = 'Description (optional)',
+  activeEnvironment,
+  environments,
+  onOpenEnvironmentModal,
 }) => {
   const handleUpdate = (id: string, field: keyof KeyValuePair, value: any) => {
     const updated = items.map((item) => (item.id === id ? { ...item, [field]: value } : item));
@@ -52,14 +59,14 @@ export const KeyValueEditor: React.FC<KeyValueEditorProps> = ({
           {items.length > 0 && (
             <button
               onClick={handleToggleAll}
-              className="text-xs text-slate-400 hover:text-slate-200 transition-colors px-2 py-0.5 rounded hover:bg-[#21262d]"
+              className="text-xs text-slate-400 hover:text-slate-200 transition-colors px-2 py-0.5 rounded hover:bg-[#21262d] cursor-pointer"
             >
               Toggle All
             </button>
           )}
           <button
             onClick={handleAdd}
-            className="flex items-center gap-1 text-xs text-sky-400 hover:text-sky-300 transition-colors px-2 py-0.5 rounded hover:bg-sky-500/10 font-medium"
+            className="flex items-center gap-1 text-xs text-sky-400 hover:text-sky-300 transition-colors px-2 py-0.5 rounded hover:bg-sky-500/10 font-medium cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5" />
             Add Row
@@ -67,13 +74,13 @@ export const KeyValueEditor: React.FC<KeyValueEditorProps> = ({
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto space-y-1 pr-1">
+      <div className="flex-1 overflow-y-auto space-y-1.5 pr-1">
         {items.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-8 text-center text-slate-500">
             <p className="text-xs">No parameters configured.</p>
             <button
               onClick={handleAdd}
-              className="mt-2 text-xs text-sky-400 hover:underline"
+              className="mt-2 text-xs text-sky-400 hover:underline cursor-pointer"
             >
               + Click to add your first parameter
             </button>
@@ -89,7 +96,7 @@ export const KeyValueEditor: React.FC<KeyValueEditorProps> = ({
               <button
                 type="button"
                 onClick={() => handleUpdate(item.id, 'enabled', !item.enabled)}
-                className="text-slate-400 hover:text-slate-200 transition-colors p-1"
+                className="text-slate-400 hover:text-slate-200 transition-colors p-1 cursor-pointer"
                 title={item.enabled ? 'Disable parameter' : 'Enable parameter'}
               >
                 {item.enabled ? (
@@ -99,21 +106,27 @@ export const KeyValueEditor: React.FC<KeyValueEditorProps> = ({
                 )}
               </button>
 
-              <input
-                type="text"
-                placeholder={keyPlaceholder}
-                value={item.key}
-                onChange={(e) => handleUpdate(item.id, 'key', e.target.value)}
-                className="w-1/3 bg-[#0d1117] border border-[#30363d] rounded px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-sky-500 font-mono"
-              />
+              <div className="w-1/3">
+                <VariableInput
+                  placeholder={keyPlaceholder}
+                  value={item.key}
+                  onChange={(val) => handleUpdate(item.id, 'key', val)}
+                  activeEnvironment={activeEnvironment}
+                  environments={environments}
+                  onOpenEnvironmentModal={onOpenEnvironmentModal}
+                />
+              </div>
 
-              <input
-                type="text"
-                placeholder={valuePlaceholder}
-                value={item.value}
-                onChange={(e) => handleUpdate(item.id, 'value', e.target.value)}
-                className="flex-1 bg-[#0d1117] border border-[#30363d] rounded px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-sky-500 font-mono"
-              />
+              <div className="flex-1">
+                <VariableInput
+                  placeholder={valuePlaceholder}
+                  value={item.value}
+                  onChange={(val) => handleUpdate(item.id, 'value', val)}
+                  activeEnvironment={activeEnvironment}
+                  environments={environments}
+                  onOpenEnvironmentModal={onOpenEnvironmentModal}
+                />
+              </div>
 
               <input
                 type="text"
@@ -126,7 +139,7 @@ export const KeyValueEditor: React.FC<KeyValueEditorProps> = ({
               <button
                 type="button"
                 onClick={() => handleDelete(item.id)}
-                className="text-slate-500 hover:text-rose-400 transition-colors p-1 rounded opacity-0 group-hover:opacity-100"
+                className="text-slate-500 hover:text-rose-400 transition-colors p-1 rounded opacity-0 group-hover:opacity-100 cursor-pointer"
                 title="Delete parameter"
               >
                 <Trash2 className="w-3.5 h-3.5" />

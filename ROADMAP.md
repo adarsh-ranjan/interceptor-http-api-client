@@ -55,9 +55,9 @@ flowchart TD
 
 | Milestone | Deliverable | Status |
 | :--- | :--- | :--- |
-| **Phase 1: Core MVP** | Electron + Vite + React 19 + TypeScript + Tailwind CSS workspace; CORS-free Node HTTP proxy; URL bar, method selector, Headers/Params/Body editors, deep Response viewer | ✅ Complete |
+| **Phase 1: Core MVP** | Electron + Vite + React 19 + TypeScript + Tailwind CSS workspace; CORS-free Node HTTP proxy; URL bar with instant cURL paste & auto-import; method selector; Headers/Params/Body editors; deep Response viewer | ✅ Complete |
 | **Phase 2: Collections & Migration** | Nested collection hierarchy, folders, Postman v2.1 import/export, collection/folder/request deletion modals, Save flow (`⌘S`) | ✅ Complete |
-| **Phase 3: Environments & Variables** | Environment manager, `{{baseUrl}}` variable resolution across URLs/headers/body, dynamic built-in tokens (`{{$guid}}`, `{{$timestamp}}`, `{{$isoTimestamp}}`, `{{$randomInt}}`) | ✅ Complete |
+| **Phase 3: Environments & Variables** | Environment manager, universal variable interpolation across Auth/Body/Headers/Params/Tests, interactive on-hover resolution tooltips, `{{baseUrl}}` variable resolution, dynamic built-in tokens (`{{$guid}}`, `{{$timestamp}}`, `{{$isoTimestamp}}`, `{{$randomInt}}`) | ✅ Complete |
 | **Phase 4: Auth & Rich Payloads** | Bearer Token, Basic Auth, API Key helpers; Multipart Form-Data with file uploads, `x-www-form-urlencoded`, raw text, and binary file streaming | ✅ Complete |
 | **Phase 5: Code Gen & Testing** | Multi-language Code Generator (cURL, JS Fetch/Axios, Python Requests, Go, Dart); JavaScript test assertions runner; Response saving | ✅ Complete |
 | **Phase 6: Multi-Protocol & Runner** | Real-time WebSocket client (`wss://`) with frame composer and live stream; Newman-style batch collection runner with executive scorecards | ✅ Complete |

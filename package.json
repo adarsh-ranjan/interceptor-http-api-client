@@ -6,6 +6,7 @@
   "scripts": {
     "dev:vite": "vite",
     "dev:electron": "electron .",
+    "test": "jiti ./test/curlParser.test.ts && jiti ./test/variables.test.ts",
     "build:electron": "tsc -p electron/tsconfig.json",
     "build:renderer": "vite build",
     "build": "npm run build:electron && npm run build:renderer",

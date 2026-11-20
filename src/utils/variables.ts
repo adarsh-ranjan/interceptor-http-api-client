@@ -1,5 +1,190 @@
 import { Environment, HttpRequest, KeyValuePair, FormDataItem, AuthConfig } from '../types';
 
+export interface VariableMatch {
+  fullMatch: string;
+  varName: string;
+  startIndex: number;
+  endIndex: number;
+}
+
+export interface VariableResolutionInfo {
+  name: string;
+  value: string;
+  isResolved: boolean;
+  source: 'environment' | 'global' | 'dynamic' | 'unresolved';
+  sourceName: string;
+  error?: string;
+}
+
+/**
+ * Extracts all {{variable}} patterns from a given string with their start and end character positions.
+ */
+export function extractVariablesFromText(text: string): VariableMatch[] {
+  if (!text || typeof text !== 'string') return [];
+  const regex = /\{\{([^{}]+)\}\}/g;
+  const matches: VariableMatch[] = [];
+  let match: RegExpExecArray | null;
+  while ((match = regex.exec(text)) !== null) {
+    matches.push({
+      fullMatch: match[0],
+      varName: match[1].trim(),
+      startIndex: match.index,
+      endIndex: match.index + match[0].length,
+    });
+  }
+  return matches;
+}
+
+/**
+ * Finds the variable (if any) containing the given character index.
+ */
+export function findVariableAtCharIndex(text: string, charIndex: number): VariableMatch | null {
+  const vars = extractVariablesFromText(text);
+  return vars.find((v) => charIndex >= v.startIndex && charIndex < v.endIndex) || null;
+}
+
+/**
+ * Finds the variable (if any) at a specific 0-indexed line and character offset in multiline text.
+ */
+export function findVariableInMultilineText(
+  text: string,
+  lineIndex: number,
+  charInLine: number
+): VariableMatch | null {
+  if (!text || typeof text !== 'string') return null;
+  const lines = text.split('\n');
+  if (lineIndex < 0 || lineIndex >= lines.length) return null;
+
+  let offset = 0;
+  for (let i = 0; i < lineIndex; i++) {
+    offset += lines[i].length + 1; // +1 for '\n'
+  }
+  const targetIndex = offset + charInLine;
+  return findVariableAtCharIndex(text, targetIndex);
+}
+
+/**
+ * Resolves detailed metadata for a variable name against active and global environments or dynamic generators.
+ */
+export function resolveVariableInfo(
+  varName: string,
+  activeEnv?: Environment,
+  environments?: Environment[]
+): VariableResolutionInfo {
+  const trimmed = varName.trim();
+
+  // Dynamic system variables
+  if (trimmed === '$guid' || trimmed === '$uuid') {
+    return {
+      name: trimmed,
+      value: 'Generates a random v4 UUID (e.g. ' + 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+        const r = (Math.random() * 16) | 0;
+        const v = c === 'x' ? r : (r & 0x3) | 0x8;
+        return v.toString(16);
+      }) + ')',
+      isResolved: true,
+      source: 'dynamic',
+      sourceName: 'Dynamic Generator',
+    };
+  }
+
+  if (trimmed === '$timestamp') {
+    return {
+      name: trimmed,
+      value: `Current Unix timestamp (e.g. ${Date.now()})`,
+      isResolved: true,
+      source: 'dynamic',
+      sourceName: 'Dynamic Generator',
+    };
+  }
+
+  if (trimmed === '$isoTimestamp') {
+    return {
+      name: trimmed,
+      value: `Current ISO 8601 timestamp (e.g. ${new Date().toISOString()})`,
+      isResolved: true,
+      source: 'dynamic',
+      sourceName: 'Dynamic Generator',
+    };
+  }
+
+  if (trimmed === '$randomInt') {
+    return {
+      name: trimmed,
+      value: `Random integer 1-1000 (e.g. ${Math.floor(Math.random() * 1000 + 1)})`,
+      isResolved: true,
+      source: 'dynamic',
+      sourceName: 'Dynamic Generator',
+    };
+  }
+
+  // Active environment variable
+  if (activeEnv && activeEnv.variables) {
+    const matched = activeEnv.variables.find((v) => v.key.trim() === trimmed);
+    if (matched) {
+      if (matched.enabled) {
+        return {
+          name: trimmed,
+          value: matched.value,
+          isResolved: true,
+          source: 'environment',
+          sourceName: activeEnv.name,
+        };
+      } else {
+        return {
+          name: trimmed,
+          value: matched.value,
+          isResolved: false,
+          source: 'unresolved',
+          sourceName: activeEnv.name,
+          error: `Variable is disabled in '${activeEnv.name}' environment`,
+        };
+      }
+    }
+  }
+
+  // Global environment if present
+  if (environments) {
+    const globalEnv = environments.find((e) => e.isGlobal);
+    if (globalEnv && globalEnv.variables) {
+      const matched = globalEnv.variables.find((v) => v.key.trim() === trimmed);
+      if (matched) {
+        if (matched.enabled) {
+          return {
+            name: trimmed,
+            value: matched.value,
+            isResolved: true,
+            source: 'global',
+            sourceName: 'Globals',
+          };
+        } else {
+          return {
+            name: trimmed,
+            value: matched.value,
+            isResolved: false,
+            source: 'unresolved',
+            sourceName: 'Globals',
+            error: 'Variable is disabled in global environment',
+          };
+        }
+      }
+    }
+  }
+
+  // Unresolved variable
+  const activeName = activeEnv ? `'${activeEnv.name}'` : 'active environment';
+  return {
+    name: trimmed,
+    value: '',
+    isResolved: false,
+    source: 'unresolved',
+    sourceName: activeEnv ? activeEnv.name : 'No Environment',
+    error: activeEnv
+      ? `Variable '${trimmed}' is not defined in ${activeName}`
+      : `No active environment selected (variable '${trimmed}' cannot be resolved)`,
+  };
+}
+
 export function getVariableMap(
   activeEnv?: Environment,
   globalEnv?: Environment

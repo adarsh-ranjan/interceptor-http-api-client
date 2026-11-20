@@ -26,6 +26,15 @@ A modern, lightning-fast, cross-platform desktop API client (Postman alternative
 
 ### Phase 1: Core Engine & Workbench
 - **CORS-Free Native Networking**: Requests execute directly within the Node.js main process, completely bypassing browser CORS restrictions and proxy blocks.
+- **Instant cURL Paste & Auto-Import (`cURL` Indicator)**:
+  - Paste any raw cURL command directly into the request URL bar (`Ctrl+V` / `⌘V` or input paste).
+  - Interceptor automatically detects cURL commands, tokenizes flags and multiline commands (`\` and `^`), and instantly populates the active request:
+    - **HTTP Method**: Maps `-X` / `--request` (or `-I` for `HEAD`, `-G` for `GET`). If a payload is provided without an explicit method, automatically defaults to `POST`.
+    - **URL & Query Parameters**: Extracts the target endpoint and synchronizes query parameters into the **Params** key-value table.
+    - **Headers**: Extracts `-H` / `--header` flags into active entries in the **Headers** editor. Also supports `-A` / `--user-agent`, `-e` / `--referer`, and `-b` / `--cookie`.
+    - **Authentication**: Automatically maps `-u` / `--user <user:pass>` to Basic Auth, `--oauth2-bearer <token>` and `Authorization: Bearer <token>` to Bearer Auth, and decodes Base64 `Authorization: Basic <base64>` credentials directly into the **Auth** panel.
+    - **Request Body & Payloads**: Formats JSON payloads (`-d`, `--data`, `--data-raw`, `--data-binary`) with 2-space indentation and syntax checks, parses `--data-urlencode` into urlencoded parameters, and maps `-F` / `--form` fields with file path detection (`@filename`) to multipart form-data.
+    - **Smart Subtab Focus & Toast Notification**: Automatically activates the relevant workbench subtab (**Body**, **Auth**, or **Headers**) and triggers a non-intrusive confirmation toast.
 - **Dynamic Request Workbench**:
   - HTTP method selector (`GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `HEAD`, `OPTIONS`) with distinctive color badges.
   - Instant URL synchronization: query parameters in the URL synchronize bidirectionally with the **Params** table in real time.
@@ -57,6 +66,19 @@ A modern, lightning-fast, cross-platform desktop API client (Postman alternative
 ---
 
 ### Phase 3: Environments & Dynamic Variables
+- **Universal Environment Variables Across the Entire Workbench**:
+  - Use `{{variable}}` templates anywhere in your request configuration:
+    - **Request Bar**: Full URLs, paths, and query strings (e.g. `{{baseUrl}}/posts/{{postId}}`).
+    - **Headers & Query Params**: Key-value tables in both Headers and Params tabs (e.g. `Authorization: Bearer {{apiKey}}`, `X-Tenant-ID: {{tenant}}`).
+    - **Authentication**: Bearer tokens (`{{apiKey}}`), Basic Auth username/password (`{{username}}` / `{{password}}`), and API Key name/value.
+    - **Request Body**: JSON payloads (e.g. `{"userId": {{userId}}, "token": "{{apiKey}}"}`), raw text, multipart form-data, and `x-www-form-urlencoded` forms.
+    - **Test Assertions**: Read and write environment variables programmatically with `interceptor.getEnvironmentVariable("key")`, `interceptor.environment.get("key")`, `pm.environment.get("key")`, and `setEnvironmentVariable`.
+- **Interactive On-Hover Resolution Tooltip**:
+  - Hovering directly over any `{{variable}}` anywhere across the workbench (Request Bar, Headers, Params, Auth, JSON/Raw Body, and Tests) instantly displays an interactive inspection tooltip.
+  - **Live Resolved Value**: Inspect the actual interpolated string with a 1-click **Copy** button.
+  - **Resolution Status & Scope**: Color-coded badges for **Resolved** (emerald) vs **Unresolved** (rose with specific error explanations).
+  - **Direct Scope & Management**: Shows the active environment name (`Development`, `Globals`, or `Dynamic Generator`) with a direct **Manage** link to configure environments.
+  - **Visual Syntax Highlights & Counter**: Variables are framed in amber pill badges, with variable count indicators in the Request Bar and Body Editor.
 - **Environment Management**:
   - Create and switch between environments (e.g. `Development`, `Production`, `No Environment`).
   - Active environment switcher directly in the app header bar with live status indicator.
@@ -107,9 +129,11 @@ A modern, lightning-fast, cross-platform desktop API client (Postman alternative
     - `interceptor.expect(actual).toBeLessThan(limit)` / `toBeGreaterThan(limit)`.
     - `interceptor.expect(actual).toContain(substringOrItem)`.
     - `interceptor.expect(actual).toBeTruthy()` / `toBeFalsy()` / `toBeNull()`.
-    - `interceptor.setEnvironmentVariable(key, value)`: Dynamically update active environment variables!
+    - `interceptor.getEnvironmentVariable(key)` / `pm.environment.get(key)`: Access active environment variable values in tests.
+    - `interceptor.setEnvironmentVariable(key, value)` / `pm.environment.set(key, value)`: Dynamically update active environment variables!
+    - `interceptor.replaceVariables(string)`: Interpolate variable templates programmatically.
     - `res`: Access `status`, `statusText`, `timeMs`, `sizeBytes`, `headers`, `data`, `rawBody`, `isJson`.
-  - Quick assertion snippet buttons: `Status code is 200`, `Response time < 500ms`, `Response is JSON`, `Body contains text`, `Set Environment Variable`.
+  - Quick assertion snippet buttons: `Status code is 200`, `Response time < 500ms`, `Response is JSON`, `Body contains text`, `Get Environment Variable`, `Set Environment Variable`.
 - **Interactive Test Results Inspector**:
   - Response panel includes a dedicated **Test Results** tab showing passing (green checks) and failing (red X) assertions.
   - Displays descriptive error messages for failing assertions.
@@ -168,11 +192,15 @@ Interceptor/
 │   │   ├── ResponseViewer.tsx        # Pretty JSON, raw, headers & test results
 │   │   ├── SaveRequestModal.tsx      # Save request to collection modal
 │   │   ├── Sidebar.tsx               # Collapsible collections & history panel
+│   │   ├── Toast.tsx                 # Non-intrusive action confirmation toasts
+│   │   ├── VariableHoverTooltip.tsx  # Interactive environment variable inspector tooltip
+│   │   ├── VariableInput.tsx         # Reusable input with syntax pill highlights & variable hover
 │   │   └── WebSocketWorkbench.tsx    # WSS client & live stream
 │   ├── types/          # TypeScript interfaces (requests, responses, collections, envs)
 │   ├── utils/          # Core utilities
 │   │   ├── auth.ts                   # Auth resolution and header injection
 │   │   ├── codegen.ts                # cURL, JS, Python, Go, Dart snippet generator
+│   │   ├── curlParser.ts             # cURL tokenizer and auto-import parser
 │   │   ├── http.ts                   # URL parsing, query sync, byte/duration formatters
 │   │   ├── postman.ts                # Postman v2.1 import & export serializer
 │   │   ├── testRunner.ts             # Sandboxed JavaScript test assertions engine

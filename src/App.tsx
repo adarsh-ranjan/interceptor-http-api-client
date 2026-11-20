@@ -38,6 +38,8 @@ import { EnvironmentModal } from './components/EnvironmentModal';
 import { CodeSnippetModal } from './components/CodeSnippetModal';
 import { CollectionRunnerModal } from './components/CollectionRunnerModal';
 import { WebSocketWorkbench } from './components/WebSocketWorkbench';
+import { Toast, ToastData } from './components/Toast';
+import { ParsedCurlResult } from './utils/curlParser';
 import { Shield, CheckSquare, Radio } from 'lucide-react';
 
 const DEFAULT_REQUEST: HttpRequest = {
@@ -208,6 +210,16 @@ export const App: React.FC = () => {
   const [isEnvModalOpen, setIsEnvModalOpen] = useState(false);
   const [isCodeModalOpen, setIsCodeModalOpen] = useState(false);
   const [collectionToRun, setCollectionToRun] = useState<Collection | null>(null);
+
+  // Toast Notification State
+  const [toast, setToast] = useState<ToastData | null>(null);
+
+  const showToast = useCallback((toastData: Omit<ToastData, 'id'>) => {
+    setToast({
+      ...toastData,
+      id: Math.random().toString(36).substring(2, 9),
+    });
+  }, []);
 
   // Window Maximized / Fullscreen State
   const [isMaximized, setIsMaximized] = useState(false);
@@ -384,6 +396,59 @@ export const App: React.FC = () => {
       };
     });
   };
+
+  // Handle cURL Import from RequestBar paste
+  const handleImportCurl = useCallback(
+    (parsed: ParsedCurlResult) => {
+      updateActiveRequest((prev) => {
+        let newName = prev.name;
+        if (!newName || newName === 'New Request') {
+          const cleanPath = parsed.url.replace(/^https?:\/\//, '').split('?')[0];
+          newName = `${parsed.method} ${cleanPath.slice(0, 30)}`;
+        }
+        return {
+          ...prev,
+          name: newName,
+          method: parsed.method,
+          url: parsed.url,
+          params: parsed.params,
+          headers: parsed.headers,
+          auth: parsed.auth,
+          bodyType: parsed.bodyType,
+          bodyContent: parsed.bodyContent,
+          urlEncoded: parsed.urlEncoded,
+          formData: parsed.formData,
+        };
+      });
+
+      // Switch to relevant subtab
+      if (parsed.bodyType !== 'none') {
+        setConfigSubTab('body');
+      } else if (parsed.auth && parsed.auth.type !== 'none') {
+        setConfigSubTab('auth');
+      } else if (parsed.headers.length > 0) {
+        setConfigSubTab('headers');
+      } else if (parsed.params.length > 0) {
+        setConfigSubTab('params');
+      }
+
+      // Show toast
+      const cleanPath = parsed.url.replace(/^https?:\/\//, '').split('?')[0];
+      const summaryDetails = [
+        parsed.headers.length > 0 ? `${parsed.headers.length} header${parsed.headers.length > 1 ? 's' : ''}` : null,
+        parsed.params.length > 0 ? `${parsed.params.length} param${parsed.params.length > 1 ? 's' : ''}` : null,
+        parsed.auth && parsed.auth.type !== 'none' ? `${parsed.auth.type} auth` : null,
+        parsed.bodyType !== 'none' ? `body (${parsed.bodyType})` : null,
+      ].filter(Boolean).join(', ');
+
+      showToast({
+        type: 'success',
+        title: `cURL imported: ${parsed.method} ${cleanPath.slice(0, 35) || 'request'}`,
+        message: summaryDetails || 'All request components populated successfully',
+      });
+    },
+    [updateActiveRequest, showToast]
+  );
 
   const handleParamsChange = (newParams: KeyValuePair[]) => {
     updateActiveRequest((prev) => {
@@ -592,7 +657,9 @@ export const App: React.FC = () => {
       const results = runTestScript(
         activeTab.request.testScript,
         responseData,
-        handleSetEnvVarFromScript
+        handleSetEnvVarFromScript,
+        activeEnvironment,
+        environments
       );
       responseData.testResults = results;
     }
@@ -1230,6 +1297,10 @@ export const App: React.FC = () => {
               onCancel={handleCancelRequest}
               onSave={handleSaveActiveRequest}
               onOpenCodeSnippet={() => setIsCodeModalOpen(true)}
+              onImportCurl={handleImportCurl}
+              activeEnvironment={activeEnvironment}
+              environments={environments}
+              onOpenEnvironmentModal={() => setIsEnvModalOpen(true)}
               isLoading={activeTab.isLoading}
               isDirty={activeTab.isDirty}
             />
@@ -1327,6 +1398,9 @@ export const App: React.FC = () => {
                       onChange={handleParamsChange}
                       keyPlaceholder="Parameter Name"
                       valuePlaceholder="Value (e.g. {{limit}})"
+                      activeEnvironment={activeEnvironment}
+                      environments={environments}
+                      onOpenEnvironmentModal={() => setIsEnvModalOpen(true)}
                     />
                   )}
 
@@ -1334,6 +1408,9 @@ export const App: React.FC = () => {
                     <AuthEditor
                       auth={activeTab.request.auth}
                       onChange={handleAuthChange}
+                      activeEnvironment={activeEnvironment}
+                      environments={environments}
+                      onOpenEnvironmentModal={() => setIsEnvModalOpen(true)}
                     />
                   )}
 
@@ -1343,6 +1420,9 @@ export const App: React.FC = () => {
                       onChange={handleHeadersChange}
                       keyPlaceholder="Header Name (e.g. Authorization)"
                       valuePlaceholder="Header Value (e.g. Bearer {{apiKey}})"
+                      activeEnvironment={activeEnvironment}
+                      environments={environments}
+                      onOpenEnvironmentModal={() => setIsEnvModalOpen(true)}
                     />
                   )}
 
@@ -1359,6 +1439,9 @@ export const App: React.FC = () => {
                       binaryFilePath={activeTab.request.binaryFilePath}
                       binaryFileName={activeTab.request.binaryFileName}
                       onBinaryFileChange={handleBinaryFileChange}
+                      activeEnvironment={activeEnvironment}
+                      environments={environments}
+                      onOpenEnvironmentModal={() => setIsEnvModalOpen(true)}
                     />
                   )}
 
@@ -1366,6 +1449,9 @@ export const App: React.FC = () => {
                     <TestScriptEditor
                       script={activeTab.request.testScript || ''}
                       onChange={handleTestScriptChange}
+                      activeEnvironment={activeEnvironment}
+                      environments={environments}
+                      onOpenEnvironmentModal={() => setIsEnvModalOpen(true)}
                     />
                   )}
                 </div>
@@ -1419,6 +1505,9 @@ export const App: React.FC = () => {
         environments={environments}
         activeEnvId={activeEnvId}
       />
+
+      {/* Toast Notification Container */}
+      <Toast toast={toast} onDismiss={() => setToast(null)} />
     </div>
   );
 };

@@ -1,15 +1,22 @@
 import React, { useState } from 'react';
-import { AuthConfig, AuthType } from '../types';
-import { Shield, Key, Lock, Eye, EyeOff, Info, CheckCircle2 } from 'lucide-react';
+import { AuthConfig, AuthType, Environment } from '../types';
+import { Shield, Key, Eye, EyeOff, Info, CheckCircle2 } from 'lucide-react';
+import { VariableInput } from './VariableInput';
 
 interface AuthEditorProps {
   auth?: AuthConfig;
   onChange: (auth: AuthConfig) => void;
+  activeEnvironment?: Environment;
+  environments?: Environment[];
+  onOpenEnvironmentModal?: () => void;
 }
 
 export const AuthEditor: React.FC<AuthEditorProps> = ({
   auth = { type: 'none' },
   onChange,
+  activeEnvironment,
+  environments,
+  onOpenEnvironmentModal,
 }) => {
   const [showSecret, setShowSecret] = useState(false);
 
@@ -39,7 +46,7 @@ export const AuthEditor: React.FC<AuthEditorProps> = ({
         <select
           value={auth.type}
           onChange={(e) => handleTypeChange(e.target.value as AuthType)}
-          className="flex-1 bg-[#0d1117] border border-[#30363d] rounded px-3 py-1.5 text-slate-100 font-medium focus:outline-none focus:border-sky-500"
+          className="flex-1 bg-[#0d1117] border border-[#30363d] rounded px-3 py-1.5 text-slate-100 font-medium focus:outline-none focus:border-sky-500 cursor-pointer"
         >
           <option value="none">No Auth</option>
           <option value="bearer">Bearer Token</option>
@@ -55,7 +62,7 @@ export const AuthEditor: React.FC<AuthEditorProps> = ({
           <div>
             <p className="text-slate-300 font-medium">This request does not use authentication.</p>
             <p className="text-[11px] mt-0.5">
-              Select an authentication type above to automatically configure Bearer tokens, Basic credentials, or API keys.
+              Select an authentication type above to automatically configure Bearer tokens, Basic credentials, or API keys with environment variable support (e.g. <code className="text-amber-300">{'{{apiKey}}'}</code>).
             </p>
           </div>
         </div>
@@ -70,17 +77,20 @@ export const AuthEditor: React.FC<AuthEditorProps> = ({
               <span>Token</span>
             </label>
             <div className="relative flex items-center">
-              <input
+              <VariableInput
                 type={showSecret ? 'text' : 'password'}
                 placeholder="e.g. {{apiKey}} or eyJhbGciOi..."
                 value={auth.bearerToken || ''}
-                onChange={(e) => handleFieldChange('bearerToken', e.target.value)}
-                className="w-full bg-[#161b22] border border-[#30363d] rounded px-3 py-1.5 pr-8 text-slate-100 font-mono text-xs focus:outline-none focus:border-sky-500"
+                onChange={(val) => handleFieldChange('bearerToken', val)}
+                activeEnvironment={activeEnvironment}
+                environments={environments}
+                onOpenEnvironmentModal={onOpenEnvironmentModal}
+                className="pr-8"
               />
               <button
                 type="button"
                 onClick={() => setShowSecret(!showSecret)}
-                className="absolute right-2.5 text-slate-400 hover:text-white"
+                className="absolute right-2.5 z-20 text-slate-400 hover:text-white cursor-pointer"
                 title={showSecret ? 'Hide token' : 'Show token'}
               >
                 {showSecret ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
@@ -100,29 +110,33 @@ export const AuthEditor: React.FC<AuthEditorProps> = ({
         <div className="space-y-3 bg-[#0d1117] p-3.5 rounded-md border border-[#30363d]">
           <div>
             <label className="block text-slate-400 font-medium mb-1">Username</label>
-            <input
-              type="text"
+            <VariableInput
               placeholder="e.g. {{username}} or admin"
               value={auth.basicUsername || ''}
-              onChange={(e) => handleFieldChange('basicUsername', e.target.value)}
-              className="w-full bg-[#161b22] border border-[#30363d] rounded px-3 py-1.5 text-slate-100 font-mono text-xs focus:outline-none focus:border-sky-500"
+              onChange={(val) => handleFieldChange('basicUsername', val)}
+              activeEnvironment={activeEnvironment}
+              environments={environments}
+              onOpenEnvironmentModal={onOpenEnvironmentModal}
             />
           </div>
 
           <div>
             <label className="block text-slate-400 font-medium mb-1">Password</label>
             <div className="relative flex items-center">
-              <input
+              <VariableInput
                 type={showSecret ? 'text' : 'password'}
                 placeholder="e.g. {{password}} or secret"
                 value={auth.basicPassword || ''}
-                onChange={(e) => handleFieldChange('basicPassword', e.target.value)}
-                className="w-full bg-[#161b22] border border-[#30363d] rounded px-3 py-1.5 pr-8 text-slate-100 font-mono text-xs focus:outline-none focus:border-sky-500"
+                onChange={(val) => handleFieldChange('basicPassword', val)}
+                activeEnvironment={activeEnvironment}
+                environments={environments}
+                onOpenEnvironmentModal={onOpenEnvironmentModal}
+                className="pr-8"
               />
               <button
                 type="button"
                 onClick={() => setShowSecret(!showSecret)}
-                className="absolute right-2.5 text-slate-400 hover:text-white"
+                className="absolute right-2.5 z-20 text-slate-400 hover:text-white cursor-pointer"
                 title={showSecret ? 'Hide password' : 'Show password'}
               >
                 {showSecret ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
@@ -142,29 +156,33 @@ export const AuthEditor: React.FC<AuthEditorProps> = ({
         <div className="space-y-3 bg-[#0d1117] p-3.5 rounded-md border border-[#30363d]">
           <div>
             <label className="block text-slate-400 font-medium mb-1">Key Name</label>
-            <input
-              type="text"
-              placeholder="e.g. X-API-Key or api_key"
+            <VariableInput
+              placeholder="e.g. X-API-Key or {{apiKeyName}}"
               value={auth.apiKeyName || ''}
-              onChange={(e) => handleFieldChange('apiKeyName', e.target.value)}
-              className="w-full bg-[#161b22] border border-[#30363d] rounded px-3 py-1.5 text-slate-100 font-mono text-xs focus:outline-none focus:border-sky-500"
+              onChange={(val) => handleFieldChange('apiKeyName', val)}
+              activeEnvironment={activeEnvironment}
+              environments={environments}
+              onOpenEnvironmentModal={onOpenEnvironmentModal}
             />
           </div>
 
           <div>
             <label className="block text-slate-400 font-medium mb-1">Value</label>
             <div className="relative flex items-center">
-              <input
+              <VariableInput
                 type={showSecret ? 'text' : 'password'}
                 placeholder="e.g. {{apiKey}} or 9e248b1..."
                 value={auth.apiKeyValue || ''}
-                onChange={(e) => handleFieldChange('apiKeyValue', e.target.value)}
-                className="w-full bg-[#161b22] border border-[#30363d] rounded px-3 py-1.5 pr-8 text-slate-100 font-mono text-xs focus:outline-none focus:border-sky-500"
+                onChange={(val) => handleFieldChange('apiKeyValue', val)}
+                activeEnvironment={activeEnvironment}
+                environments={environments}
+                onOpenEnvironmentModal={onOpenEnvironmentModal}
+                className="pr-8"
               />
               <button
                 type="button"
                 onClick={() => setShowSecret(!showSecret)}
-                className="absolute right-2.5 text-slate-400 hover:text-white"
+                className="absolute right-2.5 z-20 text-slate-400 hover:text-white cursor-pointer"
               >
                 {showSecret ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
               </button>
@@ -181,7 +199,7 @@ export const AuthEditor: React.FC<AuthEditorProps> = ({
                   value="header"
                   checked={auth.apiKeyLocation === 'header'}
                   onChange={() => handleFieldChange('apiKeyLocation', 'header')}
-                  className="text-sky-500 focus:ring-0"
+                  className="text-sky-500 focus:ring-0 cursor-pointer"
                 />
                 <span className="text-slate-300">Header</span>
               </label>
@@ -193,7 +211,7 @@ export const AuthEditor: React.FC<AuthEditorProps> = ({
                   value="query"
                   checked={auth.apiKeyLocation === 'query'}
                   onChange={() => handleFieldChange('apiKeyLocation', 'query')}
-                  className="text-sky-500 focus:ring-0"
+                  className="text-sky-500 focus:ring-0 cursor-pointer"
                 />
                 <span className="text-slate-300">Query Params</span>
               </label>

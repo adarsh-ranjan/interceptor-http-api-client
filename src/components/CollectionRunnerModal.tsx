@@ -151,7 +151,7 @@ export const CollectionRunnerModal: React.FC<CollectionRunnerModalProps> = ({
 
         // Run assertions
         const testResults = interpolatedReq.testScript
-          ? runTestScript(interpolatedReq.testScript, resData)
+          ? runTestScript(interpolatedReq.testScript, resData, undefined, activeEnv, environments)
           : [];
 
         const testPassed = testResults.filter((t) => t.passed).length;

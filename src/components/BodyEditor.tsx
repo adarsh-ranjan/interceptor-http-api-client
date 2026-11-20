@@ -1,14 +1,20 @@
-import React from 'react';
-import { BodyType, FormDataItem, KeyValuePair } from '../types';
+import React, { useRef, useState, useEffect } from 'react';
+import { BodyType, FormDataItem, KeyValuePair, Environment } from '../types';
 import {
   FileUp,
   Plus,
   CheckSquare,
   Square,
-  FileCode,
   Trash2,
 } from 'lucide-react';
 import { JsonBodyEditor } from './JsonBodyEditor';
+import { VariableInput } from './VariableInput';
+import { VariableHoverTooltip } from './VariableHoverTooltip';
+import {
+  findVariableInMultilineText,
+  resolveVariableInfo,
+  VariableResolutionInfo,
+} from '../utils/variables';
 
 interface BodyEditorProps {
   bodyType: BodyType;
@@ -22,6 +28,9 @@ interface BodyEditorProps {
   binaryFilePath?: string;
   binaryFileName?: string;
   onBinaryFileChange: (filePath?: string, fileName?: string) => void;
+  activeEnvironment?: Environment;
+  environments?: Environment[];
+  onOpenEnvironmentModal?: () => void;
 }
 
 export const BodyEditor: React.FC<BodyEditorProps> = ({
@@ -36,7 +45,70 @@ export const BodyEditor: React.FC<BodyEditorProps> = ({
   binaryFilePath,
   binaryFileName,
   onBinaryFileChange,
+  activeEnvironment,
+  environments,
+  onOpenEnvironmentModal,
 }) => {
+  const rawTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const rawHoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [hoveredRawVar, setHoveredRawVar] = useState<{
+    info: VariableResolutionInfo;
+    x: number;
+    y: number;
+  } | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (rawHoverTimeoutRef.current) clearTimeout(rawHoverTimeoutRef.current);
+    };
+  }, []);
+
+  const handleRawMouseMove = (e: React.MouseEvent<HTMLTextAreaElement>) => {
+    if (!rawTextareaRef.current || !bodyContent) return;
+    const textarea = rawTextareaRef.current;
+    const rect = textarea.getBoundingClientRect();
+    const style = window.getComputedStyle(textarea);
+    const paddingLeft = parseFloat(style.paddingLeft) || 12;
+    const paddingTop = parseFloat(style.paddingTop) || 12;
+    const lineHeight = parseFloat(style.lineHeight) || 18;
+    const charWidth = 7.2;
+
+    const mouseX = e.clientX - rect.left - paddingLeft + textarea.scrollLeft;
+    const mouseY = e.clientY - rect.top - paddingTop + textarea.scrollTop;
+
+    if (mouseX < 0 || mouseY < 0) {
+      if (rawHoverTimeoutRef.current) clearTimeout(rawHoverTimeoutRef.current);
+      rawHoverTimeoutRef.current = setTimeout(() => setHoveredRawVar(null), 100);
+      return;
+    }
+
+    const lineIndex = Math.floor(mouseY / lineHeight);
+    const charInLine = Math.floor(mouseX / charWidth);
+
+    const matched = findVariableInMultilineText(bodyContent, lineIndex, charInLine);
+    if (matched) {
+      if (rawHoverTimeoutRef.current) clearTimeout(rawHoverTimeoutRef.current);
+      const info = resolveVariableInfo(matched.varName, activeEnvironment, environments);
+      setHoveredRawVar({
+        info,
+        x: Math.min(window.innerWidth - 340, Math.max(16, e.clientX - 100)),
+        y: Math.min(window.innerHeight - 180, e.clientY + 14),
+      });
+    } else {
+      if (rawHoverTimeoutRef.current) clearTimeout(rawHoverTimeoutRef.current);
+      rawHoverTimeoutRef.current = setTimeout(() => {
+        setHoveredRawVar(null);
+      }, 120);
+    }
+  };
+
+  const handleRawMouseLeave = () => {
+    if (rawHoverTimeoutRef.current) clearTimeout(rawHoverTimeoutRef.current);
+    rawHoverTimeoutRef.current = setTimeout(() => {
+      setHoveredRawVar(null);
+    }, 180);
+  };
+
   // Form-Data item actions
   const handleAddFormData = () => {
     const newItem: FormDataItem = {
@@ -128,7 +200,7 @@ export const BodyEditor: React.FC<BodyEditorProps> = ({
                 value={type}
                 checked={bodyType === type}
                 onChange={() => onBodyTypeChange(type)}
-                className="text-sky-500 focus:ring-0 bg-[#0d1117] border-[#30363d]"
+                className="text-sky-500 focus:ring-0 bg-[#0d1117] border-[#30363d] cursor-pointer"
               />
               <span
                 className={bodyType === type ? 'text-sky-400 font-semibold' : 'text-slate-400'}
@@ -148,31 +220,57 @@ export const BodyEditor: React.FC<BodyEditorProps> = ({
             <p>This request has no body payload.</p>
             <button
               onClick={() => onBodyTypeChange('json')}
-              className="mt-2 text-sky-400 hover:underline"
+              className="mt-2 text-sky-400 hover:underline cursor-pointer"
             >
               Switch to JSON body
             </button>
           </div>
         )}
 
-        {/* JSON BODY EDITOR (Postman-style) */}
+        {/* JSON BODY EDITOR (Postman-style with variable highlighting and hover preview) */}
         {bodyType === 'json' && (
           <JsonBodyEditor
             value={bodyContent}
             onChange={onBodyContentChange}
             placeholder={'{\n  "title": "New Post",\n  "userId": 1\n}'}
+            activeEnvironment={activeEnvironment}
+            environments={environments}
+            onOpenEnvironmentModal={onOpenEnvironmentModal}
           />
         )}
 
         {/* RAW TEXT */}
         {bodyType === 'text' && (
-          <textarea
-            value={bodyContent}
-            onChange={(e) => onBodyContentChange(e.target.value)}
-            placeholder="Enter raw text payload..."
-            spellCheck={false}
-            className="w-full h-full p-3 font-mono text-xs bg-transparent text-slate-200 resize-none focus:outline-none leading-relaxed"
-          />
+          <div className="relative w-full h-full">
+            <textarea
+              ref={rawTextareaRef}
+              value={bodyContent}
+              onChange={(e) => {
+                setHoveredRawVar(null);
+                onBodyContentChange(e.target.value);
+              }}
+              onMouseMove={handleRawMouseMove}
+              onMouseLeave={handleRawMouseLeave}
+              placeholder="Enter raw text payload (supports {{variable}} references)..."
+              spellCheck={false}
+              className="w-full h-full p-3 font-mono text-xs bg-transparent text-slate-200 resize-none focus:outline-none leading-relaxed"
+            />
+            {hoveredRawVar && (
+              <VariableHoverTooltip
+                info={hoveredRawVar.info}
+                x={hoveredRawVar.x}
+                y={hoveredRawVar.y}
+                onMouseEnter={() => {
+                  if (rawHoverTimeoutRef.current) clearTimeout(rawHoverTimeoutRef.current);
+                }}
+                onMouseLeave={() => {
+                  if (rawHoverTimeoutRef.current) clearTimeout(rawHoverTimeoutRef.current);
+                  setHoveredRawVar(null);
+                }}
+                onOpenEnvModal={onOpenEnvironmentModal}
+              />
+            )}
+          </div>
         )}
 
         {/* MULTIPART FORM-DATA */}
@@ -185,7 +283,7 @@ export const BodyEditor: React.FC<BodyEditorProps> = ({
               <button
                 type="button"
                 onClick={handleAddFormData}
-                className="flex items-center gap-1 text-sky-400 hover:text-sky-300 font-medium px-2 py-0.5 rounded hover:bg-sky-500/10"
+                className="flex items-center gap-1 text-sky-400 hover:text-sky-300 font-medium px-2 py-0.5 rounded hover:bg-sky-500/10 cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>Add Field</span>
@@ -197,7 +295,7 @@ export const BodyEditor: React.FC<BodyEditorProps> = ({
                 <p>No form-data fields added.</p>
                 <button
                   onClick={handleAddFormData}
-                  className="mt-2 text-sky-400 hover:underline"
+                  className="mt-2 text-sky-400 hover:underline cursor-pointer"
                 >
                   + Add first field
                 </button>
@@ -211,7 +309,7 @@ export const BodyEditor: React.FC<BodyEditorProps> = ({
                   <button
                     type="button"
                     onClick={() => handleUpdateFormData(item.id, 'enabled', !item.enabled)}
-                    className="text-slate-400 hover:text-slate-200"
+                    className="text-slate-400 hover:text-slate-200 cursor-pointer"
                   >
                     {item.enabled ? (
                       <CheckSquare className="w-4 h-4 text-sky-400" />
@@ -220,20 +318,23 @@ export const BodyEditor: React.FC<BodyEditorProps> = ({
                     )}
                   </button>
 
-                  <input
-                    type="text"
-                    placeholder="Key"
-                    value={item.key}
-                    onChange={(e) => handleUpdateFormData(item.id, 'key', e.target.value)}
-                    className="w-1/3 bg-[#0d1117] border border-[#30363d] rounded px-2.5 py-1 text-slate-100 font-mono focus:outline-none focus:border-sky-500"
-                  />
+                  <div className="w-1/3">
+                    <VariableInput
+                      placeholder="Key"
+                      value={item.key}
+                      onChange={(val) => handleUpdateFormData(item.id, 'key', val)}
+                      activeEnvironment={activeEnvironment}
+                      environments={environments}
+                      onOpenEnvironmentModal={onOpenEnvironmentModal}
+                    />
+                  </div>
 
                   <select
                     value={item.type}
                     onChange={(e) =>
                       handleUpdateFormData(item.id, 'type', e.target.value as 'text' | 'file')
                     }
-                    className="bg-[#0d1117] border border-[#30363d] rounded px-2 py-1 text-slate-300 focus:outline-none focus:border-sky-500 font-medium"
+                    className="bg-[#0d1117] border border-[#30363d] rounded px-2 py-1 text-slate-300 focus:outline-none focus:border-sky-500 font-medium cursor-pointer"
                   >
                     <option value="text">Text</option>
                     <option value="file">File</option>
@@ -244,7 +345,7 @@ export const BodyEditor: React.FC<BodyEditorProps> = ({
                       <button
                         type="button"
                         onClick={() => handlePickFileForFormData(item.id)}
-                        className="flex items-center gap-1 px-2.5 py-1 rounded bg-[#21262d] hover:bg-[#30363d] text-slate-200 border border-[#30363d]"
+                        className="flex items-center gap-1 px-2.5 py-1 rounded bg-[#21262d] hover:bg-[#30363d] text-slate-200 border border-[#30363d] cursor-pointer"
                       >
                         <FileUp className="w-3.5 h-3.5 text-sky-400" />
                         <span>{item.fileName || 'Select File...'}</span>
@@ -256,19 +357,22 @@ export const BodyEditor: React.FC<BodyEditorProps> = ({
                       )}
                     </div>
                   ) : (
-                    <input
-                      type="text"
-                      placeholder="Value"
-                      value={item.value}
-                      onChange={(e) => handleUpdateFormData(item.id, 'value', e.target.value)}
-                      className="flex-1 bg-[#0d1117] border border-[#30363d] rounded px-2.5 py-1 text-slate-100 font-mono focus:outline-none focus:border-sky-500"
-                    />
+                    <div className="flex-1">
+                      <VariableInput
+                        placeholder="Value"
+                        value={item.value}
+                        onChange={(val) => handleUpdateFormData(item.id, 'value', val)}
+                        activeEnvironment={activeEnvironment}
+                        environments={environments}
+                        onOpenEnvironmentModal={onOpenEnvironmentModal}
+                      />
+                    </div>
                   )}
 
                   <button
                     type="button"
                     onClick={() => handleDeleteFormData(item.id)}
-                    className="text-slate-500 hover:text-rose-400 p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="text-slate-500 hover:text-rose-400 p-1 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
@@ -288,7 +392,7 @@ export const BodyEditor: React.FC<BodyEditorProps> = ({
               <button
                 type="button"
                 onClick={handleAddUrlEncoded}
-                className="flex items-center gap-1 text-sky-400 hover:text-sky-300 font-medium px-2 py-0.5 rounded hover:bg-sky-500/10"
+                className="flex items-center gap-1 text-sky-400 hover:text-sky-300 font-medium px-2 py-0.5 rounded hover:bg-sky-500/10 cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>Add Row</span>
@@ -300,7 +404,7 @@ export const BodyEditor: React.FC<BodyEditorProps> = ({
                 <p>No urlencoded fields added.</p>
                 <button
                   onClick={handleAddUrlEncoded}
-                  className="mt-2 text-sky-400 hover:underline"
+                  className="mt-2 text-sky-400 hover:underline cursor-pointer"
                 >
                   + Add first row
                 </button>
@@ -314,7 +418,7 @@ export const BodyEditor: React.FC<BodyEditorProps> = ({
                   <button
                     type="button"
                     onClick={() => handleUpdateUrlEncoded(item.id, 'enabled', !item.enabled)}
-                    className="text-slate-400 hover:text-slate-200"
+                    className="text-slate-400 hover:text-slate-200 cursor-pointer"
                   >
                     {item.enabled ? (
                       <CheckSquare className="w-4 h-4 text-sky-400" />
@@ -323,26 +427,32 @@ export const BodyEditor: React.FC<BodyEditorProps> = ({
                     )}
                   </button>
 
-                  <input
-                    type="text"
-                    placeholder="Key"
-                    value={item.key}
-                    onChange={(e) => handleUpdateUrlEncoded(item.id, 'key', e.target.value)}
-                    className="w-1/3 bg-[#0d1117] border border-[#30363d] rounded px-2.5 py-1 text-slate-100 font-mono focus:outline-none focus:border-sky-500"
-                  />
+                  <div className="w-1/3">
+                    <VariableInput
+                      placeholder="Key"
+                      value={item.key}
+                      onChange={(val) => handleUpdateUrlEncoded(item.id, 'key', val)}
+                      activeEnvironment={activeEnvironment}
+                      environments={environments}
+                      onOpenEnvironmentModal={onOpenEnvironmentModal}
+                    />
+                  </div>
 
-                  <input
-                    type="text"
-                    placeholder="Value"
-                    value={item.value}
-                    onChange={(e) => handleUpdateUrlEncoded(item.id, 'value', e.target.value)}
-                    className="flex-1 bg-[#0d1117] border border-[#30363d] rounded px-2.5 py-1 text-slate-100 font-mono focus:outline-none focus:border-sky-500"
-                  />
+                  <div className="flex-1">
+                    <VariableInput
+                      placeholder="Value"
+                      value={item.value}
+                      onChange={(val) => handleUpdateUrlEncoded(item.id, 'value', val)}
+                      activeEnvironment={activeEnvironment}
+                      environments={environments}
+                      onOpenEnvironmentModal={onOpenEnvironmentModal}
+                    />
+                  </div>
 
                   <button
                     type="button"
                     onClick={() => handleDeleteUrlEncoded(item.id)}
-                    className="text-slate-500 hover:text-rose-400 p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="text-slate-500 hover:text-rose-400 p-1 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
@@ -354,48 +464,49 @@ export const BodyEditor: React.FC<BodyEditorProps> = ({
 
         {/* BINARY FILE */}
         {bodyType === 'binary' && (
-          <div className="flex flex-col items-center justify-center h-full p-6 text-center text-slate-400 space-y-3">
-            <FileCode className="w-10 h-10 text-sky-400 stroke-[1.5]" />
+          <div className="flex flex-col items-center justify-center h-full p-6 text-center space-y-3">
+            <div className="p-4 rounded-full bg-[#161b22] border border-[#30363d]">
+              <FileUp className="w-8 h-8 text-sky-400" />
+            </div>
+
             <div>
-              <p className="text-slate-200 font-medium">Binary Payload Upload</p>
-              <p className="text-[11px] text-slate-500 mt-0.5">
-                Send raw files, images, archives, or blobs directly as the request body.
+              <p className="text-slate-300 font-medium">Select a file to send as binary data</p>
+              <p className="text-[11px] text-slate-500 mt-1 max-w-sm">
+                Stream binary payloads (images, PDFs, archives, custom binaries) directly in the request stream without browser memory limits.
               </p>
             </div>
 
             {binaryFilePath ? (
-              <div className="flex items-center gap-3 bg-[#161b22] border border-[#30363d] rounded-md px-3 py-2 max-w-md w-full justify-between">
-                <div className="truncate text-left">
-                  <p className="text-slate-200 font-medium truncate font-mono">
-                    {binaryFileName || 'Selected File'}
-                  </p>
-                  <p className="text-[10px] text-slate-500 truncate font-mono">
-                    {binaryFilePath}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
+              <div className="flex flex-col items-center gap-2 mt-2">
+                <div className="px-3 py-1.5 rounded bg-[#161b22] border border-sky-500/40 text-sky-300 font-mono text-xs flex items-center gap-2">
+                  <span>{binaryFileName || 'Selected file'}</span>
                   <button
-                    onClick={handlePickBinaryFile}
-                    className="px-2 py-1 rounded bg-[#21262d] hover:bg-[#30363d] text-slate-200 font-medium"
-                  >
-                    Change
-                  </button>
-                  <button
+                    type="button"
                     onClick={() => onBinaryFileChange(undefined, undefined)}
-                    className="text-slate-500 hover:text-rose-400 p-1"
-                    title="Remove file"
+                    className="text-slate-400 hover:text-rose-400 cursor-pointer"
+                    title="Remove binary file"
                   >
-                    <Trash2 className="w-4 h-4" />
+                    ×
                   </button>
                 </div>
+                <span className="text-[10px] text-slate-500 font-mono truncate max-w-md">
+                  {binaryFilePath}
+                </span>
+                <button
+                  type="button"
+                  onClick={handlePickBinaryFile}
+                  className="text-xs text-sky-400 hover:underline cursor-pointer"
+                >
+                  Change file...
+                </button>
               </div>
             ) : (
               <button
+                type="button"
                 onClick={handlePickBinaryFile}
-                className="flex items-center gap-2 px-4 py-2 rounded-md bg-sky-600 hover:bg-sky-500 text-white font-medium shadow-sm transition-all"
+                className="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded text-xs font-medium shadow transition-colors cursor-pointer"
               >
-                <FileUp className="w-4 h-4" />
-                <span>Choose File to Upload</span>
+                Choose File...
               </button>
             )}
           </div>

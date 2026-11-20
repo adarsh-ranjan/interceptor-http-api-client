@@ -1,9 +1,12 @@
-import { HttpResponse, TestResult } from '../types';
+import { HttpResponse, TestResult, Environment } from '../types';
+import { getVariableMap, interpolateString } from './variables';
 
 export function runTestScript(
   scriptText: string,
   response: HttpResponse,
-  onSetEnvVar?: (key: string, value: string) => void
+  onSetEnvVar?: (key: string, value: string) => void,
+  activeEnv?: Environment,
+  environments?: Environment[]
 ): TestResult[] {
   if (!scriptText || !scriptText.trim()) return [];
 
@@ -79,20 +82,54 @@ export function runTestScript(
       }
     },
     expect: (actual: any) => createExpect(actual),
+    getEnvironmentVariable: (key: string) => {
+      const vars = getVariableMap(activeEnv, environments?.find((e) => e.isGlobal));
+      return vars[key] ?? null;
+    },
     setEnvironmentVariable: (key: string, value: any) => {
       if (onSetEnvVar && key) {
         onSetEnvVar(key, String(value));
       }
+    },
+    environment: {
+      get: (key: string) => {
+        const vars = getVariableMap(activeEnv, environments?.find((e) => e.isGlobal));
+        return vars[key] ?? null;
+      },
+      set: (key: string, value: any) => {
+        if (onSetEnvVar && key) {
+          onSetEnvVar(key, String(value));
+        }
+      },
+      has: (key: string) => {
+        const vars = getVariableMap(activeEnv, environments?.find((e) => e.isGlobal));
+        return key in vars;
+      },
+    },
+    replaceVariables: (text: string) => {
+      const vars = getVariableMap(activeEnv, environments?.find((e) => e.isGlobal));
+      return interpolateString(text, vars);
     },
     log: (...args: any[]) => {
       console.log('[Interceptor Test]', ...args);
     },
   };
 
+  const pmContext = {
+    test: interceptorContext.test,
+    expect: interceptorContext.expect,
+    environment: interceptorContext.environment,
+    response: {
+      json: () => response.data,
+      text: () => response.rawBody,
+      status: response.status,
+    },
+  };
+
   try {
-    // Execute test script in isolated scope
-    const testFunction = new Function('interceptor', 'res', scriptText);
-    testFunction(interceptorContext, response);
+    // Execute test script in isolated scope with interceptor, res, and pm
+    const testFunction = new Function('interceptor', 'res', 'pm', scriptText);
+    testFunction(interceptorContext, response, pmContext);
   } catch (globalErr: any) {
     results.push({
       id: 'syntax-error',
@@ -123,7 +160,11 @@ export const TEST_SNIPPETS = [
     code: `interceptor.test("Body contains text", () => {\n  interceptor.expect(res.rawBody).toContain("success");\n});\n`,
   },
   {
+    name: 'Get Environment Variable',
+    code: `interceptor.test("Read environment variable", () => {\n  const baseUrl = interceptor.getEnvironmentVariable("baseUrl");\n  interceptor.log("Active baseUrl is:", baseUrl);\n  interceptor.expect(baseUrl).toBeTruthy();\n});\n`,
+  },
+  {
     name: 'Set Environment Variable',
-    code: `interceptor.test("Store auth token", () => {\n  // Assuming response JSON contains a token field\n  if (res.data && res.data.token) {\n    interceptor.setEnvironmentVariable("authToken", res.data.token);\n  }\n});\n`,
+    code: `interceptor.test("Store auth token", () => {\n  // Assuming response JSON contains a token or id\n  if (res.data && res.data.token) {\n    interceptor.setEnvironmentVariable("authToken", res.data.token);\n  }\n});\n`,
   },
 ];

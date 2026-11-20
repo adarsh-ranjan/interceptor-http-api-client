@@ -1,4 +1,12 @@
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
+import { Environment } from '../types';
+import {
+  extractVariablesFromText,
+  findVariableInMultilineText,
+  resolveVariableInfo,
+  VariableResolutionInfo,
+} from '../utils/variables';
+import { VariableHoverTooltip } from './VariableHoverTooltip';
 import {
   Sparkles,
   Minimize2,
@@ -10,6 +18,7 @@ import {
   AlertCircle,
   WrapText,
   FoldHorizontal,
+  Braces,
 } from 'lucide-react';
 import { JsonSyntaxViewer } from './JsonSyntaxViewer';
 
@@ -17,21 +26,44 @@ interface JsonBodyEditorProps {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
+  activeEnvironment?: Environment;
+  environments?: Environment[];
+  onOpenEnvironmentModal?: () => void;
 }
 
 export const JsonBodyEditor: React.FC<JsonBodyEditorProps> = ({
   value,
   onChange,
   placeholder = '{\n  "title": "New Post",\n  "userId": 1\n}',
+  activeEnvironment,
+  environments,
+  onOpenEnvironmentModal,
 }) => {
   const [viewMode, setViewMode] = useState<'edit' | 'tree'>('edit');
   const [isWrapEnabled, setIsWrapEnabled] = useState(false);
   const [actionNotice, setActionNotice] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
+  const [hoveredVar, setHoveredVar] = useState<{
+    info: VariableResolutionInfo;
+    x: number;
+    y: number;
+  } | null>(null);
+
+  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const charWidthRef = useRef<number>(0);
+
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const preRef = useRef<HTMLDivElement>(null);
   const gutterRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    return () => {
+      if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+    };
+  }, []);
+
+  const variablesInBody = useMemo(() => extractVariablesFromText(value), [value]);
 
   // Validate JSON syntax
   const validation = useMemo(() => {
@@ -148,6 +180,127 @@ export const JsonBodyEditor: React.FC<JsonBodyEditorProps> = ({
     }
   };
 
+  // Measure character width for monospace textarea
+  const getCharWidth = (el: HTMLTextAreaElement): number => {
+    if (charWidthRef.current > 0) return charWidthRef.current;
+    try {
+      const style = window.getComputedStyle(el);
+      const span = document.createElement('span');
+      span.style.font = style.font;
+      span.style.fontFamily = style.fontFamily;
+      span.style.fontSize = style.fontSize;
+      span.style.fontWeight = style.fontWeight;
+      span.style.letterSpacing = style.letterSpacing;
+      span.style.visibility = 'hidden';
+      span.style.position = 'absolute';
+      span.style.whiteSpace = 'pre';
+      span.textContent = 'M'.repeat(100);
+      document.body.appendChild(span);
+      const width = span.getBoundingClientRect().width / 100;
+      document.body.removeChild(span);
+      if (width > 0) {
+        charWidthRef.current = width;
+        return width;
+      }
+    } catch {
+      // fallback
+    }
+    return 7.2;
+  };
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLTextAreaElement>) => {
+    if (!textareaRef.current || !value) return;
+    const textarea = textareaRef.current;
+    const rect = textarea.getBoundingClientRect();
+    const style = window.getComputedStyle(textarea);
+    const paddingLeft = parseFloat(style.paddingLeft) || 10;
+    const paddingTop = parseFloat(style.paddingTop) || 10;
+    const lineHeight = parseFloat(style.lineHeight) || 20;
+
+    const charWidth = getCharWidth(textarea);
+    if (charWidth <= 0) return;
+
+    const mouseX = e.clientX - rect.left - paddingLeft + textarea.scrollLeft;
+    const mouseY = e.clientY - rect.top - paddingTop + textarea.scrollTop;
+
+    if (mouseX < 0 || mouseY < 0) {
+      if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = setTimeout(() => setHoveredVar(null), 100);
+      return;
+    }
+
+    const lineIndex = Math.floor(mouseY / lineHeight);
+    const charInLine = Math.floor(mouseX / charWidth);
+
+    const matched = findVariableInMultilineText(value, lineIndex, charInLine);
+    if (matched) {
+      if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+      const info = resolveVariableInfo(matched.varName, activeEnvironment, environments);
+      setHoveredVar({
+        info,
+        x: Math.min(window.innerWidth - 340, Math.max(16, e.clientX - 100)),
+        y: Math.min(window.innerHeight - 180, e.clientY + 14),
+      });
+    } else {
+      if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = setTimeout(() => {
+        setHoveredVar(null);
+      }, 120);
+    }
+  };
+
+  const handleMouseLeave = () => {
+    if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+    hoverTimeoutRef.current = setTimeout(() => {
+      setHoveredVar(null);
+    }, 180);
+  };
+
+  // Helper to highlight variables in JSON tokens
+  const renderTokenWithVariables = (text: string, defaultClass: string, keyPrefix: string) => {
+    const vars = extractVariablesFromText(text);
+    if (vars.length === 0) {
+      return (
+        <span key={keyPrefix} className={defaultClass}>
+          {text}
+        </span>
+      );
+    }
+    const parts: React.ReactNode[] = [];
+    let last = 0;
+    vars.forEach((v, vIdx) => {
+      if (v.startIndex > last) {
+        parts.push(
+          <span key={`${keyPrefix}-p-${last}`} className={defaultClass}>
+            {text.substring(last, v.startIndex)}
+          </span>
+        );
+      }
+      const info = resolveVariableInfo(v.varName, activeEnvironment, environments);
+      parts.push(
+        <span
+          key={`${keyPrefix}-var-${v.startIndex}-${vIdx}`}
+          className={`rounded px-1 font-semibold ${
+            info.isResolved
+              ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+              : 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+          }`}
+        >
+          {v.fullMatch}
+        </span>
+      );
+      last = v.endIndex;
+    });
+    if (last < text.length) {
+      parts.push(
+        <span key={`${keyPrefix}-end`} className={defaultClass}>
+          {text.substring(last)}
+        </span>
+      );
+    }
+    return <React.Fragment key={keyPrefix}>{parts}</React.Fragment>;
+  };
+
   // Tokenize a single line of JSON for Postman styling
   const renderLineTokens = (line: string) => {
     const tokenRegex =
@@ -180,11 +333,7 @@ export const JsonBodyEditor: React.FC<JsonBodyEditorProps> = ({
         const keyPart = token.substring(0, colonIdx);
         const colonPart = token.substring(colonIdx);
 
-        parts.push(
-          <span key={`${pKey}-k`} className="text-sky-400 font-semibold">
-            {keyPart}
-          </span>
-        );
+        parts.push(renderTokenWithVariables(keyPart, 'text-sky-400 font-semibold', `${pKey}-k`));
         parts.push(
           <span key={`${pKey}-col`} className="text-slate-500 font-bold">
             {colonPart}
@@ -192,11 +341,7 @@ export const JsonBodyEditor: React.FC<JsonBodyEditorProps> = ({
         );
       } else if (token.startsWith('"')) {
         // String Value
-        parts.push(
-          <span key={pKey} className="text-orange-300 font-medium">
-            {token}
-          </span>
-        );
+        parts.push(renderTokenWithVariables(token, 'text-orange-300 font-medium', pKey));
       } else if (token === 'true' || token === 'false') {
         // Boolean
         parts.push(
@@ -233,11 +378,7 @@ export const JsonBodyEditor: React.FC<JsonBodyEditorProps> = ({
           </span>
         );
       } else {
-        parts.push(
-          <span key={pKey} className="text-slate-300">
-            {token}
-          </span>
-        );
+        parts.push(renderTokenWithVariables(token, 'text-slate-300', pKey));
       }
 
       lastIndex = tokenRegex.lastIndex;
@@ -384,6 +525,16 @@ export const JsonBodyEditor: React.FC<JsonBodyEditorProps> = ({
 
           <span className="text-slate-600">|</span>
 
+          {variablesInBody.length > 0 && (
+            <span
+              className="flex items-center gap-1 text-[10px] text-amber-300 bg-amber-500/10 border border-amber-500/30 px-1.5 py-0.5 rounded font-mono"
+              title={`${variablesInBody.length} environment variable${variablesInBody.length > 1 ? 's' : ''} in body`}
+            >
+              <Braces className="w-2.5 h-2.5 text-amber-400" />
+              <span>{variablesInBody.length} {variablesInBody.length === 1 ? 'var' : 'vars'}</span>
+            </span>
+          )}
+
           <span className="text-[10px] text-slate-500 font-mono">
             {lines.length} {lines.length === 1 ? 'line' : 'lines'}
           </span>
@@ -428,9 +579,14 @@ export const JsonBodyEditor: React.FC<JsonBodyEditorProps> = ({
               <textarea
                 ref={textareaRef}
                 value={value}
-                onChange={(e) => onChange(e.target.value)}
+                onChange={(e) => {
+                  setHoveredVar(null);
+                  onChange(e.target.value);
+                }}
                 onScroll={handleScroll}
                 onKeyDown={handleKeyDown}
+                onMouseMove={handleMouseMove}
+                onMouseLeave={handleMouseLeave}
                 placeholder={placeholder}
                 spellCheck={false}
                 autoCapitalize="off"
@@ -453,6 +609,23 @@ export const JsonBodyEditor: React.FC<JsonBodyEditorProps> = ({
           </div>
         )}
       </div>
+
+      {/* Variable Hover Tooltip */}
+      {hoveredVar && (
+        <VariableHoverTooltip
+          info={hoveredVar.info}
+          x={hoveredVar.x}
+          y={hoveredVar.y}
+          onMouseEnter={() => {
+            if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+          }}
+          onMouseLeave={() => {
+            if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+            setHoveredVar(null);
+          }}
+          onOpenEnvModal={onOpenEnvironmentModal}
+        />
+      )}
     </div>
   );
 };
