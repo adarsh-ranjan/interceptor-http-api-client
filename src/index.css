@@ -1,19 +1,43 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@300;400;500;600;700;800&display=swap');
 @import "tailwindcss";
+
+@theme {
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
 
 @layer base {
   :root {
-    --bg-main: #0d1117;
-    --bg-surface: #161b22;
-    --bg-surface-hover: #21262d;
-    --border-color: #30363d;
+    --bg-base: #1a1a1a;
+    --bg-mantle: #222224;
+    --bg-surface: #26292b;
+    --bg-surface-hover: #2e3235;
+    --border-subtle: #2a2a2a;
+    --border-main: #333333;
+    --border-strong: #444444;
+    --primary-amber: #d99b26;
+    --primary-amber-hover: #c48b20;
+    --primary-amber-strong: #e5a730;
+    --text-base: #cccccc;
+    --text-muted: #888888;
   }
 
   body {
-    background-color: var(--bg-main);
-    color: #e6edf3;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
+    background-color: var(--bg-base);
+    color: var(--text-base);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    letter-spacing: -0.011em;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
     user-select: none;
     overflow: hidden;
+  }
+
+  /* Monospace / Code font */
+  code, pre, .font-mono {
+    font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+    letter-spacing: -0.01em;
   }
 
   /* All clickable elements should display hand pointer on hover */
@@ -60,25 +84,25 @@
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: #30363d;
+    background: #333333;
     border-radius: 3px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: #484f58;
+    background: #444444;
   }
 }
 
 /* Method badge utility colors */
 .badge-get {
-  color: #38bdf8;
-  background-color: rgba(56, 189, 248, 0.12);
-  border-color: rgba(56, 189, 248, 0.25);
+  color: #22d3ee;
+  background-color: rgba(6, 182, 212, 0.12);
+  border-color: rgba(6, 182, 212, 0.25);
 }
 
 .badge-post {
-  color: #4ade80;
-  background-color: rgba(74, 222, 128, 0.12);
-  border-color: rgba(74, 222, 128, 0.25);
+  color: #34d399;
+  background-color: rgba(52, 211, 153, 0.12);
+  border-color: rgba(52, 211, 153, 0.25);
 }
 
 .badge-put {
@@ -88,9 +112,9 @@
 }
 
 .badge-patch {
-  color: #c084fc;
-  background-color: rgba(192, 132, 252, 0.12);
-  border-color: rgba(192, 132, 252, 0.25);
+  color: #a78bfa;
+  background-color: rgba(167, 139, 250, 0.12);
+  border-color: rgba(167, 139, 250, 0.25);
 }
 
 .badge-delete {

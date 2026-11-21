@@ -1,4 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { HttpMethod, Environment } from '../types';
 import { getMethodColor } from '../utils/http';
 import { isCurlCommand, parseCurlCommand, ParsedCurlResult } from '../utils/curlParser';
@@ -6,11 +7,10 @@ import {
   extractVariablesFromText,
   findVariableAtCharIndex,
   resolveVariableInfo,
-  VariableMatch,
   VariableResolutionInfo,
 } from '../utils/variables';
 import { VariableHoverTooltip } from './VariableHoverTooltip';
-import { Send, XCircle, ChevronDown, Bookmark, Code2, Terminal, Braces } from 'lucide-react';
+import { Check, Save, Code2 } from 'lucide-react';
 
 interface RequestBarProps {
   method: HttpMethod;
@@ -29,7 +29,17 @@ interface RequestBarProps {
   isDirty?: boolean;
 }
 
-const METHODS: HttpMethod[] = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'];
+const BRUNO_METHODS = [
+  'GET',
+  'POST',
+  'PUT',
+  'DELETE',
+  'PATCH',
+  'OPTIONS',
+  'HEAD',
+  'TRACE',
+  'CONNECT',
+] as const;
 
 export const RequestBar: React.FC<RequestBarProps> = ({
   method,
@@ -48,13 +58,20 @@ export const RequestBar: React.FC<RequestBarProps> = ({
   isDirty,
 }) => {
   const isMac = typeof window !== 'undefined' && navigator.platform.toUpperCase().indexOf('MAC') >= 0;
-  const sendShortcut = isMac ? '⌘↵' : 'Ctrl+↵';
   const saveShortcut = isMac ? '⌘S' : 'Ctrl+S';
 
+  const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const backdropRef = useRef<HTMLDivElement>(null);
+  const methodButtonRef = useRef<HTMLButtonElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
   const charWidthRef = useRef<number>(0);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
+  const [isAddingCustom, setIsAddingCustom] = useState(false);
+  const [customInput, setCustomInput] = useState('');
 
   const [hoveredVar, setHoveredVar] = useState<{
     info: VariableResolutionInfo;
@@ -68,6 +85,62 @@ export const RequestBar: React.FC<RequestBarProps> = ({
       if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
     };
   }, []);
+
+  // Close method menu on outside click, Escape, or scroll
+  useEffect(() => {
+    if (!isMenuOpen) return;
+
+    const handlePointerDown = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (dropdownRef.current && dropdownRef.current.contains(target)) return;
+      if (methodButtonRef.current && methodButtonRef.current.contains(target)) return;
+      setIsMenuOpen(false);
+      setIsAddingCustom(false);
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsMenuOpen(false);
+        setIsAddingCustom(false);
+      }
+    };
+
+    const handleScroll = (e: Event) => {
+      if (dropdownRef.current && dropdownRef.current.contains(e.target as Node)) return;
+      setIsMenuOpen(false);
+      setIsAddingCustom(false);
+    };
+
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('scroll', handleScroll, true);
+    window.addEventListener('resize', handleScroll);
+
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('scroll', handleScroll, true);
+      window.removeEventListener('resize', handleScroll);
+    };
+  }, [isMenuOpen]);
+
+  const toggleMethodMenu = () => {
+    if (isMenuOpen) {
+      setIsMenuOpen(false);
+      setIsAddingCustom(false);
+      return;
+    }
+    // Align menu flush with the left boundary of the request URL bar
+    if (containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      setMenuPos({
+        top: rect.bottom + 4,
+        left: rect.left,
+      });
+      setIsMenuOpen(true);
+      setIsAddingCustom(false);
+    }
+  };
 
   const variablesInUrl = extractVariablesFromText(url);
 
@@ -147,7 +220,7 @@ export const RequestBar: React.FC<RequestBarProps> = ({
     const input = inputRef.current;
     const rect = input.getBoundingClientRect();
     const style = window.getComputedStyle(input);
-    const paddingLeft = parseFloat(style.paddingLeft) || 14;
+    const paddingLeft = parseFloat(style.paddingLeft) || 4;
 
     const charWidth = getCharWidth(input);
     if (charWidth <= 0) return;
@@ -199,17 +272,6 @@ export const RequestBar: React.FC<RequestBarProps> = ({
     setHoveredVar(null);
   };
 
-  const handleBadgeHover = (e: React.MouseEvent<HTMLDivElement>, vMatch: VariableMatch) => {
-    if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
-    const rect = e.currentTarget.getBoundingClientRect();
-    const info = resolveVariableInfo(vMatch.varName, activeEnvironment, environments);
-    setHoveredVar({
-      info,
-      x: rect.left + rect.width / 2,
-      y: rect.bottom + 6,
-    });
-  };
-
   const renderBackdropContent = () => {
     if (!url) return null;
     const vars = extractVariablesFromText(url);
@@ -221,7 +283,7 @@ export const RequestBar: React.FC<RequestBarProps> = ({
     vars.forEach((v, idx) => {
       if (v.startIndex > lastIndex) {
         elements.push(
-          <span key={`plain-${lastIndex}`}>
+          <span key={`plain-${lastIndex}`} className="text-slate-100">
             {url.substring(lastIndex, v.startIndex)}
           </span>
         );
@@ -231,10 +293,8 @@ export const RequestBar: React.FC<RequestBarProps> = ({
       elements.push(
         <span
           key={`var-${v.startIndex}-${idx}`}
-          className={`rounded px-0.5 -mx-0.5 ${
-            info.isResolved
-              ? 'bg-amber-500/15 border border-amber-500/30'
-              : 'bg-rose-500/15 border border-rose-500/30'
+          className={`font-semibold ${
+            info.isResolved ? 'text-emerald-400' : 'text-rose-400'
           }`}
         >
           {v.fullMatch}
@@ -245,7 +305,7 @@ export const RequestBar: React.FC<RequestBarProps> = ({
 
     if (lastIndex < url.length) {
       elements.push(
-        <span key={`plain-${lastIndex}`}>
+        <span key={`plain-${lastIndex}`} className="text-slate-100">
           {url.substring(lastIndex)}
         </span>
       );
@@ -255,119 +315,188 @@ export const RequestBar: React.FC<RequestBarProps> = ({
   };
 
   const methodColor = getMethodColor(method);
+  const isCustomMethod = !BRUNO_METHODS.includes(method as any);
 
   return (
-    <div className="flex items-center gap-2 p-2 bg-[#161b22] border-b border-[#30363d] w-full relative">
-      {/* Method Dropdown */}
-      <div className="relative group shrink-0">
-        <select
-          value={method}
-          onChange={(e) => onMethodChange(e.target.value as HttpMethod)}
-          disabled={isLoading}
-          className={`appearance-none font-mono font-bold text-xs uppercase pl-3 pr-7 py-2 rounded-l-md border border-[#30363d] bg-[#0d1117] cursor-pointer focus:outline-none focus:border-sky-500 transition-colors ${methodColor.text}`}
+    <div className="flex items-center gap-2 px-4 pt-3 pb-2 bg-[#1a1a1a] w-full relative select-none">
+      {/* Bruno-Style Integrated URL Input Box (QueryUrl) */}
+      <div
+        ref={containerRef}
+        className="flex-1 relative flex items-center bg-[#1a1a1a] border border-[#333333] rounded-md px-3 h-[34px] focus-within:border-[#444444] transition-colors"
+      >
+        {/* Method Label Button (Directly inside on the left, no borders, no chevron) */}
+        <button
+          ref={methodButtonRef}
+          type="button"
+          onClick={toggleMethodMenu}
+          className={`font-mono font-bold text-xs uppercase cursor-pointer hover:opacity-80 transition-opacity select-none mr-2.5 shrink-0 ${methodColor.text}`}
+          title="Change HTTP method"
         >
-          {METHODS.map((m) => (
-            <option key={m} value={m} className="bg-[#161b22] text-slate-200 font-sans">
-              {m}
-            </option>
-          ))}
-        </select>
-        <ChevronDown className="w-3.5 h-3.5 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400" />
-      </div>
+          {method}
+        </button>
 
-      {/* URL Input Bar */}
-      <div className="flex-1 relative flex items-center bg-[#0d1117] border border-[#30363d] rounded-r-md overflow-hidden focus-within:border-sky-500 focus-within:ring-1 focus-within:ring-sky-500/20 transition-all">
-        {/* Synchronized Variable Highlight Backdrop */}
-        <div
-          ref={backdropRef}
-          className="absolute inset-0 pointer-events-none flex items-center overflow-hidden pl-3.5 pr-28 py-2 text-xs font-mono whitespace-pre select-none text-transparent"
-          aria-hidden="true"
-        >
-          {renderBackdropContent()}
-        </div>
-
-        <input
-          ref={inputRef}
-          type="text"
-          value={url}
-          onChange={handleInputChange}
-          onPaste={handlePaste}
-          onKeyDown={handleKeyDown}
-          onMouseMove={handleMouseMove}
-          onMouseLeave={handleMouseLeave}
-          onScroll={handleScroll}
-          placeholder="Enter request URL or paste cURL (e.g. {{baseUrl}}/posts)"
-          className="w-full bg-transparent pl-3.5 pr-28 py-2 text-xs font-mono text-slate-100 placeholder:text-slate-500 focus:outline-none transition-all z-10"
-        />
-
-        {/* Right Badges: Variables Counter & cURL Indicator */}
-        <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1.5 z-20">
-          {variablesInUrl.length > 0 && (
-            <div
-              className="pointer-events-auto flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-medium text-amber-300 bg-amber-500/10 border border-amber-500/30 hover:bg-amber-500/20 cursor-pointer transition-colors"
-              title={`${variablesInUrl.length} environment variable${variablesInUrl.length > 1 ? 's' : ''} in URL (hover to inspect)`}
-              onMouseEnter={(e) => handleBadgeHover(e, variablesInUrl[0])}
-              onMouseLeave={handleMouseLeave}
-            >
-              <Braces className="w-2.5 h-2.5 text-amber-400" />
-              <span>{variablesInUrl.length === 1 ? variablesInUrl[0].varName : `${variablesInUrl.length} vars`}</span>
-            </div>
-          )}
-
-          <div className="pointer-events-none flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-medium text-slate-400 bg-[#21262d] border border-[#30363d]">
-            <Terminal className="w-2.5 h-2.5 text-sky-400" />
-            <span>cURL</span>
+        {/* URL Input with Variable Highlighting */}
+        <div className="flex-1 relative flex items-center overflow-hidden h-full">
+          <div
+            ref={backdropRef}
+            className="absolute inset-0 pointer-events-none flex items-center overflow-hidden pl-0.5 pr-16 text-xs font-mono whitespace-pre select-none text-transparent"
+            aria-hidden="true"
+          >
+            {renderBackdropContent()}
           </div>
+
+          <input
+            ref={inputRef}
+            type="text"
+            value={url}
+            onChange={handleInputChange}
+            onPaste={handlePaste}
+            onKeyDown={handleKeyDown}
+            onMouseMove={handleMouseMove}
+            onMouseLeave={handleMouseLeave}
+            onScroll={handleScroll}
+            placeholder="Enter URL or paste a cURL request"
+            className={`w-full bg-transparent pl-0.5 pr-16 text-xs font-mono outline-none z-10 ${
+              variablesInUrl.length > 0 ? 'text-transparent caret-white' : 'text-[#ffffff] placeholder:text-[#666666]'
+            }`}
+          />
+        </div>
+
+        {/* Action Buttons Inside URL Input Box: Code Generator & Save */}
+        <div className="flex items-center gap-2 shrink-0 ml-1.5 z-20">
+          {/* Code Snippet Button (</>) */}
+          <button
+            type="button"
+            onClick={onOpenCodeSnippet}
+            className="p-1 text-[#999999] hover:text-[#cccccc] hover:bg-[#26292b] rounded transition-colors cursor-pointer"
+            title="Generate Code Snippet (cURL, Python, JS, Go)"
+          >
+            <Code2 className="w-3.5 h-3.5" />
+          </button>
+
+          {/* Save Button (Floppy disk icon) */}
+          <button
+            type="button"
+            onClick={onSave}
+            className={`p-1 rounded transition-colors cursor-pointer relative ${
+              isDirty
+                ? 'text-[#d99b26] hover:text-[#e5a730]'
+                : 'text-[#999999] hover:text-[#cccccc] hover:bg-[#26292b]'
+            }`}
+            title={isDirty ? `Save Request (${saveShortcut}) • Unsaved changes` : `Save Request (${saveShortcut})`}
+          >
+            <Save className="w-3.5 h-3.5" />
+            {isDirty && (
+              <span className="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-[#d99b26] shadow-xs shadow-amber-500/50" />
+            )}
+          </button>
         </div>
       </div>
 
-      {/* Code Snippet Button */}
-      <button
-        type="button"
-        onClick={onOpenCodeSnippet}
-        className="flex items-center gap-1.5 px-3 py-2 rounded-md text-xs font-medium border border-[#30363d] bg-[#0d1117] text-slate-300 hover:bg-[#21262d] hover:text-white transition-all shrink-0 cursor-pointer"
-        title="Generate code snippet (cURL, Python, JS, Go)"
-      >
-        <Code2 className="w-3.5 h-3.5 text-sky-400" />
-        <span className="hidden sm:inline">Code</span>
-      </button>
-
-      {/* Save Button */}
-      <button
-        type="button"
-        onClick={onSave}
-        className={`flex items-center gap-1.5 px-3 py-2 rounded-md text-xs font-medium border transition-all shrink-0 cursor-pointer ${
-          isDirty
-            ? 'bg-amber-500/10 border-amber-500/40 text-amber-300 hover:bg-amber-500/20'
-            : 'bg-[#0d1117] border-[#30363d] text-slate-300 hover:bg-[#21262d] hover:text-white'
-        }`}
-        title={`Save request (${saveShortcut})`}
-      >
-        <Bookmark className={`w-3.5 h-3.5 ${isDirty ? 'text-amber-400 fill-amber-400/30' : 'text-slate-400'}`} />
-        <span>Save</span>
-        <span className="text-[10px] opacity-60 font-mono ml-0.5">{saveShortcut}</span>
-      </button>
-
-      {/* Send or Cancel Button */}
+      {/* Send or Cancel Button (Outside Input Box) */}
       {isLoading ? (
         <button
           type="button"
           onClick={onCancel}
-          className="flex items-center gap-1.5 px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-md text-xs font-semibold shadow-sm transition-all animate-pulse shrink-0 cursor-pointer"
+          className="px-4 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-md text-xs font-medium shadow-sm transition-all animate-pulse shrink-0 cursor-pointer h-[34px]"
         >
-          <XCircle className="w-4 h-4" />
-          <span>Cancel</span>
+          Cancel
         </button>
       ) : (
         <button
           type="button"
           onClick={onSend}
-          className="flex items-center gap-1.5 px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-md text-xs font-semibold shadow-sm transition-all hover:shadow-sky-500/20 shrink-0 cursor-pointer"
+          className="px-5 py-1.5 bg-[#d99b26] hover:bg-[#c48b20] text-white rounded-md text-xs font-semibold shadow-xs transition-colors shrink-0 cursor-pointer h-[34px]"
         >
-          <Send className="w-3.5 h-3.5" />
-          <span>Send</span>
-          <span className="text-[10px] opacity-75 font-mono ml-0.5">{sendShortcut}</span>
+          Send
         </button>
+      )}
+
+      {/* Floating Bruno-style HTTP Method Menu (Aligned flush with input container left) */}
+      {isMenuOpen && menuPos && createPortal(
+        <div
+          ref={dropdownRef}
+          style={{
+            position: 'fixed',
+            top: `${menuPos.top}px`,
+            left: `${menuPos.left}px`,
+            zIndex: 9999,
+          }}
+          className="w-36 bg-[#222224] border border-[#333333] rounded-md shadow-2xl py-1 text-xs select-none backdrop-blur-md animate-in fade-in zoom-in-95 duration-100"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {BRUNO_METHODS.map((m) => {
+            const isSelected = method === m;
+            return (
+              <button
+                key={m}
+                type="button"
+                onClick={() => {
+                  onMethodChange(m);
+                  setIsMenuOpen(false);
+                }}
+                className={`w-full flex items-center justify-between px-3 py-1.5 font-mono text-xs text-left transition-colors cursor-pointer ${
+                  isSelected
+                    ? 'text-white bg-[#26292b] font-semibold'
+                    : 'text-[#cccccc] hover:text-white hover:bg-[#26292b]'
+                }`}
+              >
+                <span>{m}</span>
+                {isSelected && <Check className="w-3.5 h-3.5 text-[#d99b26]" />}
+              </button>
+            );
+          })}
+
+          {/* If current method is a custom method */}
+          {isCustomMethod && (
+            <div className="w-full flex items-center justify-between px-3 py-1.5 font-mono text-xs text-white bg-[#26292b] font-semibold border-t border-[#333333]">
+              <span className="truncate">{method}</span>
+              <Check className="w-3.5 h-3.5 text-[#d99b26] shrink-0" />
+            </div>
+          )}
+
+          <div className="my-1 border-t border-[#333333]" />
+
+          {/* Add Custom Method Option */}
+          {isAddingCustom ? (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (customInput.trim()) {
+                  onMethodChange(customInput.trim().toUpperCase());
+                  setCustomInput('');
+                  setIsAddingCustom(false);
+                  setIsMenuOpen(false);
+                }
+              }}
+              className="px-2.5 py-1 flex items-center gap-1"
+            >
+              <input
+                type="text"
+                autoFocus
+                placeholder="METHOD"
+                value={customInput}
+                onChange={(e) => setCustomInput(e.target.value)}
+                className="w-full bg-[#1a1a1a] border border-[#d99b26] rounded px-1.5 py-0.5 text-xs font-mono uppercase text-white outline-none"
+              />
+              <button
+                type="submit"
+                className="px-1.5 py-0.5 bg-[#d99b26] hover:bg-[#c2871a] text-white rounded text-xs font-bold"
+              >
+                ✓
+              </button>
+            </form>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setIsAddingCustom(true)}
+              className="w-full flex items-center px-3 py-1.5 text-[#888888] hover:text-[#d99b26] hover:bg-[#26292b] font-mono text-xs text-left transition-colors cursor-pointer"
+            >
+              + Add Custom
+            </button>
+          )}
+        </div>,
+        document.body
       )}
 
       {/* Variable Hover Tooltip */}

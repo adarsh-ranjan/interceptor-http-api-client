@@ -229,8 +229,8 @@ export const JsonSyntaxViewer: React.FC<JsonSyntaxViewerProps> = ({
         const keyPart = token.substring(0, colonIdx);
         const colonPart = token.substring(colonIdx);
 
-        parts.push(renderWithHighlight(keyPart, 'text-sky-400 font-semibold', `${pKey}-k`));
-        parts.push(<span key={`${pKey}-col`} className="text-slate-400">{colonPart}</span>);
+        parts.push(renderWithHighlight(keyPart, 'text-[#61afef] font-normal', `${pKey}-k`));
+        parts.push(<span key={`${pKey}-col`} className="text-[#888888]">{colonPart}</span>);
       } else if (token.startsWith('"')) {
         // String Value
         const unquoted = token.slice(1, -1);
@@ -239,7 +239,7 @@ export const JsonSyntaxViewer: React.FC<JsonSyntaxViewerProps> = ({
         parts.push(
           renderWithHighlight(
             token,
-            'text-orange-300 font-medium',
+            'text-[#e5c07b] font-normal',
             `${pKey}-str`,
             isUrl,
             unquoted
@@ -247,21 +247,21 @@ export const JsonSyntaxViewer: React.FC<JsonSyntaxViewerProps> = ({
         );
       } else if (token === 'true' || token === 'false') {
         // Boolean
-        parts.push(renderWithHighlight(token, 'text-purple-400 font-bold', `${pKey}-bool`));
+        parts.push(renderWithHighlight(token, 'text-[#ef596f] font-normal', `${pKey}-bool`));
       } else if (token === 'null') {
         // Null
-        parts.push(renderWithHighlight(token, 'text-rose-400 font-bold', `${pKey}-null`));
+        parts.push(renderWithHighlight(token, 'text-[#ef596f] font-normal', `${pKey}-null`));
       } else if (/^-?\d/.test(token)) {
         // Number
-        parts.push(renderWithHighlight(token, 'text-emerald-400 font-mono', `${pKey}-num`));
+        parts.push(renderWithHighlight(token, 'text-[#d19a66] font-mono font-normal', `${pKey}-num`));
       } else if (token === '{' || token === '}' || token === '[' || token === ']') {
         // Brackets & Braces
-        parts.push(<span key={pKey} className="text-slate-100 font-bold">{token}</span>);
+        parts.push(<span key={pKey} className="text-[#abb2bf] font-normal">{token}</span>);
       } else if (token === ',') {
         // Comma
-        parts.push(<span key={pKey} className="text-slate-500 font-bold">{token}</span>);
+        parts.push(<span key={pKey} className="text-[#888888] font-normal">{token}</span>);
       } else {
-        parts.push(<span key={pKey} className="text-slate-300">{token}</span>);
+        parts.push(<span key={pKey} className="text-[#abb2bf]">{token}</span>);
       }
 
       lastIndex = tokenRegex.lastIndex;
@@ -315,25 +315,25 @@ export const JsonSyntaxViewer: React.FC<JsonSyntaxViewerProps> = ({
   }, [rawLines, foldRanges, foldedStarts]);
 
   return (
-    <div className="flex flex-col h-full bg-[#0d1117] text-xs font-mono select-text">
+    <div className="flex flex-col h-full bg-[#1a1a1a] text-xs font-mono select-text">
       {/* Response JSON Toolbar */}
-      <div className="flex items-center justify-between px-3 py-1.5 bg-[#161b22] border-b border-[#30363d] select-none text-[11px] flex-wrap gap-2 shrink-0">
+      <div className="flex items-center justify-between px-3 py-1.5 bg-[#222224] border-b border-[#333333] select-none text-[11px] flex-wrap gap-2 shrink-0">
         {/* Left Side: Search in JSON */}
         <div className="flex items-center gap-2">
           <div className="relative flex items-center">
-            <Search className="w-3 h-3 absolute left-2 text-slate-500 pointer-events-none" />
+            <Search className="w-3 h-3 absolute left-2 text-[#777777] pointer-events-none" />
             <input
               type="text"
               placeholder="Search in JSON..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="bg-[#0d1117] border border-[#30363d] rounded pl-6 pr-6 py-0.5 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-sky-500 w-44 font-sans"
+              className="bg-[#1a1a1a] border border-[#333333] rounded pl-6 pr-6 py-0.5 text-xs text-[#cccccc] placeholder:text-[#666666] focus:outline-none focus:border-[#444444] w-44 font-sans"
             />
             {searchTerm && (
               <button
                 type="button"
                 onClick={() => setSearchTerm('')}
-                className="absolute right-1.5 text-slate-500 hover:text-white"
+                className="absolute right-1.5 text-[#777777] hover:text-white"
               >
                 <X className="w-3 h-3" />
               </button>
@@ -341,18 +341,18 @@ export const JsonSyntaxViewer: React.FC<JsonSyntaxViewerProps> = ({
           </div>
 
           {searchTerm && (
-            <span className="text-[10px] text-slate-400 font-mono">
+            <span className="text-[10px] text-[#888888] font-mono">
               {matchCount} {matchCount === 1 ? 'match' : 'matches'}
             </span>
           )}
         </div>
 
         {/* Right Side: Fold / Unfold & Formatting Tools */}
-        <div className="flex items-center gap-2 text-slate-400">
+        <div className="flex items-center gap-2 text-[#888888]">
           <button
             type="button"
             onClick={collapseAll}
-            className="flex items-center gap-1 hover:text-slate-200 px-1.5 py-0.5 rounded hover:bg-[#21262d] transition-colors"
+            className="flex items-center gap-1 hover:text-[#cccccc] px-1.5 py-0.5 rounded hover:bg-[#26292b] transition-colors cursor-pointer"
             title="Collapse all objects and arrays"
           >
             <FoldHorizontal className="w-3 h-3" />
@@ -362,7 +362,7 @@ export const JsonSyntaxViewer: React.FC<JsonSyntaxViewerProps> = ({
           <button
             type="button"
             onClick={expandAll}
-            className="flex items-center gap-1 hover:text-slate-200 px-1.5 py-0.5 rounded hover:bg-[#21262d] transition-colors"
+            className="flex items-center gap-1 hover:text-[#cccccc] px-1.5 py-0.5 rounded hover:bg-[#26292b] transition-colors cursor-pointer"
             title="Expand all"
           >
             <UnfoldHorizontal className="w-3 h-3" />
@@ -372,8 +372,8 @@ export const JsonSyntaxViewer: React.FC<JsonSyntaxViewerProps> = ({
           <button
             type="button"
             onClick={() => setIsWrapEnabled(!isWrapEnabled)}
-            className={`flex items-center gap-1 px-1.5 py-0.5 rounded transition-colors ${
-              isWrapEnabled ? 'text-sky-400 bg-sky-500/10' : 'hover:text-slate-200 hover:bg-[#21262d]'
+            className={`flex items-center gap-1 px-1.5 py-0.5 rounded transition-colors cursor-pointer ${
+              isWrapEnabled ? 'text-[#d99b26] bg-[#d99b26]/10' : 'hover:text-[#cccccc] hover:bg-[#26292b]'
             }`}
             title="Toggle word wrap"
           >
@@ -381,9 +381,9 @@ export const JsonSyntaxViewer: React.FC<JsonSyntaxViewerProps> = ({
             <span className="hidden sm:inline">Wrap</span>
           </button>
 
-          <span className="text-slate-600">|</span>
+          <span className="text-[#444444]">|</span>
 
-          <span className="text-[10px] text-slate-500">
+          <span className="text-[10px] text-[#666666]">
             {rawLines.length} lines
           </span>
 
@@ -397,7 +397,7 @@ export const JsonSyntaxViewer: React.FC<JsonSyntaxViewerProps> = ({
       </div>
 
       {/* Code Viewer Container */}
-      <div className="flex-1 overflow-auto p-2">
+      <div className="flex-1 overflow-auto pt-4 pb-4 px-3">
         <div className="min-w-full inline-block">
           {visibleLines.map(({ originalIndex, text, isFoldStart, isFolded, foldRange }) => {
             const lineNumber = originalIndex + 1;
@@ -405,34 +405,30 @@ export const JsonSyntaxViewer: React.FC<JsonSyntaxViewerProps> = ({
             return (
               <div
                 key={originalIndex}
-                className="flex items-start hover:bg-[#161b22]/70 group transition-colors rounded-xs leading-5"
+                className="flex items-start hover:bg-[#222224]/70 group transition-colors rounded-xs leading-5"
               >
-                {/* Gutter with line numbers & fold chevron */}
-                <div className="flex items-center justify-end w-14 shrink-0 pr-2 select-none text-slate-600 group-hover:text-slate-400 border-r border-[#30363d]/40 mr-3">
+                {/* Gutter with line numbers & fold caret (NO vertical line, matches Image 2) */}
+                <div className="flex items-center justify-between w-12 shrink-0 pl-1 pr-2 select-none text-[#666666]">
+                  <span className="font-mono text-xs text-[#666666]">
+                    {lineNumber}
+                  </span>
                   {isFoldStart ? (
                     <button
                       type="button"
                       onClick={() => toggleFold(originalIndex)}
-                      className="p-0.5 text-slate-500 hover:text-sky-400 rounded hover:bg-[#21262d] transition-colors mr-1 cursor-pointer"
+                      className="w-4 h-4 flex items-center justify-center text-[#666666] hover:text-[#d99b26] transition-colors cursor-pointer text-[10px] select-none"
                       title={isFolded ? 'Expand' : 'Collapse'}
                     >
-                      {isFolded ? (
-                        <ChevronRight className="w-3 h-3 text-sky-400" />
-                      ) : (
-                        <ChevronDown className="w-3 h-3" />
-                      )}
+                      {isFolded ? '▸' : '▾'}
                     </button>
                   ) : (
-                    <span className="w-3.5 mr-1" />
+                    <span className="w-4 text-center text-transparent text-[10px]">&nbsp;</span>
                   )}
-                  <span className="font-mono text-[11px] text-slate-500 group-hover:text-slate-400">
-                    {lineNumber}
-                  </span>
                 </div>
 
                 {/* Line Code Content */}
                 <div
-                  className={`flex-1 font-mono text-xs ${
+                  className={`flex-1 font-mono text-xs pl-2 ${
                     isWrapEnabled ? 'whitespace-pre-wrap break-all' : 'whitespace-pre'
                   }`}
                 >
@@ -442,17 +438,17 @@ export const JsonSyntaxViewer: React.FC<JsonSyntaxViewerProps> = ({
                       <button
                         type="button"
                         onClick={() => toggleFold(originalIndex)}
-                        className="px-1.5 py-0.2 rounded bg-[#21262d] text-slate-400 hover:text-sky-300 text-[10px] font-mono border border-[#30363d] inline-flex items-center gap-1 cursor-pointer"
+                        className="px-1.5 py-0.2 rounded bg-[#26292b] text-[#999999] hover:text-[#d99b26] text-[10px] font-mono border border-[#333333] inline-flex items-center gap-1 cursor-pointer"
                         title="Click to expand"
                       >
                         <span>{foldRange.isObject ? '{ ... }' : '[ ... ]'}</span>
-                        <span className="text-slate-500">
+                        <span className="text-[#666666]">
                           {foldRange.itemCount} {foldRange.itemCount === 1 ? 'line' : 'lines'}
                         </span>
                       </button>
                       {foldRange.end < rawLines.length &&
                         rawLines[foldRange.end]?.trim()?.endsWith(',') && (
-                          <span className="text-slate-500 font-bold">,</span>
+                          <span className="text-[#777777] font-bold">,</span>
                       )}
                     </span>
                   ) : (
@@ -464,7 +460,7 @@ export const JsonSyntaxViewer: React.FC<JsonSyntaxViewerProps> = ({
           })}
 
           {isTruncated && (
-            <div className="mt-4 p-3 bg-[#161b22] border border-[#30363d] rounded text-slate-400 text-xs font-sans flex items-center justify-between">
+            <div className="mt-4 p-3 bg-[#222224] border border-[#333333] rounded text-[#888888] text-xs font-sans flex items-center justify-between">
               <span>
                 Showing first {MAX_LINES_RENDERED.toLocaleString()} lines of {rawLines.length.toLocaleString()} lines.
                 Switch to the <strong>Raw</strong> tab to view complete unformatted response.
