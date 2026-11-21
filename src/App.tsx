@@ -28,6 +28,7 @@ import { RequestBar } from './components/RequestBar';
 import { KeyValueEditor } from './components/KeyValueEditor';
 import { BodyEditor } from './components/BodyEditor';
 import { RequestBodyModeDropdown } from './components/RequestBodyModeDropdown';
+import { InterceptorLogo } from './components/InterceptorLogo';
 import { AuthEditor } from './components/AuthEditor';
 import { TestScriptEditor } from './components/TestScriptEditor';
 import { ResponseViewer } from './components/ResponseViewer';
@@ -1366,9 +1367,9 @@ export const App: React.FC = () => {
           </div>
         </div>
 
-        {/* Center: Bruno/Interceptor App Logo Branding */}
+        {/* Center: Interceptor App Logo Branding */}
         <div className="absolute left-1/2 -translate-x-1/2 pointer-events-none hidden md:flex items-center gap-1.5">
-          <Radio className="w-3.5 h-3.5 text-[#d99b26]" />
+          <InterceptorLogo size={16} />
           <span className="font-semibold text-xs tracking-wide text-[#cccccc] font-sans">Interceptor</span>
         </div>
 

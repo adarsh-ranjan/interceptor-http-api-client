@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="100%" height="100%">
+  <defs>
+    <!-- Background Radial Aura -->
+    <radialGradient id="auraGradient" cx="50%" cy="50%" r="55%">
+      <stop offset="0%" stop-color="#f59e0b" stop-opacity="0.32" />
+      <stop offset="60%" stop-color="#d97706" stop-opacity="0.08" />
+      <stop offset="100%" stop-color="#000000" stop-opacity="0" />
+    </radialGradient>
+
+    <!-- Metallic Gold/Amber Gradients -->
+    <linearGradient id="goldGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fef08a" />
+      <stop offset="25%" stop-color="#fbbf24" />
+      <stop offset="70%" stop-color="#d97706" />
+      <stop offset="100%" stop-color="#92400e" />
+    </linearGradient>
+
+    <linearGradient id="goldLight" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#d97706" />
+      <stop offset="50%" stop-color="#fbbf24" />
+      <stop offset="100%" stop-color="#ffffff" />
+    </linearGradient>
+
+    <linearGradient id="coreGlow" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" />
+      <stop offset="30%" stop-color="#fef08a" />
+      <stop offset="70%" stop-color="#f59e0b" />
+      <stop offset="100%" stop-color="#b45309" />
+    </linearGradient>
+
+    <!-- Squircle Border Subtle Gradient -->
+    <linearGradient id="borderGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#404349" />
+      <stop offset="100%" stop-color="#1e2023" />
+    </linearGradient>
+
+    <!-- Glow Filter -->
+    <filter id="amberGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="8" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <!-- Dark Squircle App Icon Container -->
+  <rect x="8" y="8" width="240" height="240" rx="54" fill="#141517" stroke="url(#borderGradient)" stroke-width="2.5" />
+  <rect x="9.5" y="9.5" width="237" height="237" rx="52.5" fill="none" stroke="#ffffff" stroke-opacity="0.05" stroke-width="1" />
+
+  <!-- Ambient Amber Glow behind Emblem -->
+  <circle cx="128" cy="128" r="95" fill="url(#auraGradient)" />
+
+  <!-- Glowing Interceptor Star/Chevron Symbol -->
+  <g filter="url(#amberGlow)">
+    <!-- Central Vertical Pillar Base ("I") -->
+    <rect x="119" y="70" width="18" height="116" rx="2" fill="url(#goldGradient)" stroke="#78350f" stroke-width="1.5" />
+    <!-- Bright Laser Core Filament -->
+    <rect x="125" y="76" width="6" height="104" rx="2" fill="url(#coreGlow)" />
+
+    <!-- Top-Left Kinetic Wing -->
+    <polygon points="70,68 116,112 104,124 92,106" fill="url(#goldGradient)" stroke="#78350f" stroke-width="1.5" />
+    <polygon points="70,68 92,106 104,124 74,188 92,150 116,144" fill="none" />
+
+    <!-- Top-Right Kinetic Wing -->
+    <polygon points="186,68 140,112 152,124 164,106" fill="url(#goldLight)" stroke="#78350f" stroke-width="1.5" />
+
+    <!-- Bottom-Left Kinetic Wing -->
+    <polygon points="70,188 116,144 104,132 92,150" fill="url(#goldLight)" stroke="#78350f" stroke-width="1.5" />
+
+    <!-- Bottom-Right Kinetic Wing -->
+    <polygon points="186,188 140,144 152,132 164,150" fill="url(#goldGradient)" stroke="#78350f" stroke-width="1.5" />
+
+    <!-- Outer Intercept Chevron Edges -->
+    <path d="M 70,68 L 115,112 L 102,128 L 115,144 L 70,188 L 108,138 Z" fill="url(#goldGradient)" opacity="0.95" />
+    <path d="M 186,68 L 141,112 L 154,128 L 141,144 L 186,188 L 148,138 Z" fill="url(#goldLight)" opacity="0.95" />
+
+    <!-- Central Diagonal Intercept Core Crossbar -->
+    <polygon points="106,140 148,114 150,118 108,144" fill="#fef08a" opacity="0.9" />
+  </g>
+</svg>
