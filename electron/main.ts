@@ -1,6 +1,25 @@
 import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import path from 'path';
 import fs from 'fs';
+import tls from 'tls';
+
+// Trust the OS certificate store (where corporate/proxy root CAs live) in addition to
+// Node's bundled Mozilla roots, plus any PEM bundle in NODE_EXTRA_CA_CERTS.
+// Certificate validation stays ON - we only extend the trusted CA list.
+// Packaged apps launched from Finder/Explorer don't inherit shell env vars, so relying on
+// NODE_EXTRA_CA_CERTS alone is not enough.
+function configureTrustedCAs() {
+  try {
+    const cas = new Set<string>(tls.getCACertificates('default'));
+    for (const cert of tls.getCACertificates('system')) cas.add(cert);
+    for (const cert of tls.getCACertificates('extra')) cas.add(cert);
+    tls.setDefaultCACertificates([...cas]);
+  } catch (err) {
+    console.warn('[Interceptor] Could not load system CA certificates:', err);
+  }
+}
+
+configureTrustedCAs();
 
 let mainWindow: BrowserWindow | null = null;
 const activeRequests = new Map<string, AbortController>();
