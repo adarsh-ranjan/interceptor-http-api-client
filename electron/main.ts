@@ -8,15 +8,18 @@ const activeRequests = new Map<string, AbortController>();
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
 
 function createWindow() {
+  const iconPath = path.join(__dirname, '../build/icon.png');
+
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 840,
     minWidth: 960,
     minHeight: 640,
-    backgroundColor: '#0d1117',
+    backgroundColor: '#1a1a1a',
     title: 'Interceptor',
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
     trafficLightPosition: { x: 16, y: 12 },
+    icon: fs.existsSync(iconPath) ? iconPath : undefined,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -54,6 +57,17 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  if (process.platform === 'darwin' && app.dock) {
+    const iconPath = path.join(__dirname, '../build/icon.png');
+    if (fs.existsSync(iconPath)) {
+      try {
+        app.dock.setIcon(iconPath);
+      } catch (e) {
+        // Ignore dock setIcon errors in headless environments
+      }
+    }
+  }
+
   createWindow();
 
   app.on('activate', () => {

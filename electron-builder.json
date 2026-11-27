@@ -2,7 +2,8 @@
   "appId": "com.interceptor.app",
   "productName": "Interceptor",
   "directories": {
-    "output": "release"
+    "output": "release",
+    "buildResources": "build"
   },
   "files": [
     "dist/**/*",
@@ -10,6 +11,7 @@
     "package.json"
   ],
   "mac": {
+    "icon": "build/icon.icns",
     "target": [
       {
         "target": "dmg",
@@ -44,6 +46,7 @@
     ]
   },
   "win": {
+    "icon": "build/icon.ico",
     "target": [
       {
         "target": "nsis",
@@ -66,6 +69,7 @@
     "shortcutName": "Interceptor"
   },
   "linux": {
+    "icon": "build/icons",
     "maintainer": "Adarsh Ranjan <49054080+adarsh-ranjan@users.noreply.github.com>",
     "target": [
       {

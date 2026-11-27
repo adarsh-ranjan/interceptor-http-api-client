@@ -189,7 +189,7 @@ export const VariableInput: React.FC<VariableInputProps> = ({
 
   return (
     <div
-      className={`relative flex items-center bg-[#0d1117] border border-[#30363d] rounded overflow-hidden focus-within:border-sky-500 focus-within:ring-1 focus-within:ring-sky-500/20 transition-all ${wrapperClassName}`}
+      className={`relative flex items-center bg-[#1a1a1a] border border-[#333333] rounded overflow-hidden focus-within:border-[#444444] transition-colors ${wrapperClassName}`}
     >
       {/* Variable Highlight Backdrop */}
       <div
@@ -211,7 +211,7 @@ export const VariableInput: React.FC<VariableInputProps> = ({
         onKeyDown={onKeyDown}
         placeholder={placeholder}
         disabled={disabled}
-        className={`w-full bg-transparent px-2.5 py-1 text-xs font-mono text-slate-200 placeholder:text-slate-500 focus:outline-none transition-all z-10 ${className}`}
+        className={`w-full bg-transparent px-2.5 py-1 text-xs font-mono text-[#cccccc] placeholder:text-[#666666] focus:outline-none transition-all z-10 ${className}`}
         {...restProps}
       />
 

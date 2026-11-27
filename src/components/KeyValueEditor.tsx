@@ -1,29 +1,36 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { KeyValuePair, Environment } from '../types';
-import { Plus, Trash2, CheckSquare, Square } from 'lucide-react';
+import { Trash2, HelpCircle } from 'lucide-react';
 import { VariableInput } from './VariableInput';
 
 interface KeyValueEditorProps {
   items: KeyValuePair[];
   onChange: (items: KeyValuePair[]) => void;
+  title?: string;
   keyPlaceholder?: string;
   valuePlaceholder?: string;
   descriptionPlaceholder?: string;
   activeEnvironment?: Environment;
   environments?: Environment[];
   onOpenEnvironmentModal?: () => void;
+  showPathParams?: boolean;
 }
 
 export const KeyValueEditor: React.FC<KeyValueEditorProps> = ({
   items,
   onChange,
-  keyPlaceholder = 'Key',
+  title = 'Query',
+  keyPlaceholder = 'Name',
   valuePlaceholder = 'Value',
-  descriptionPlaceholder = 'Description (optional)',
+  descriptionPlaceholder = 'Description',
   activeEnvironment,
   environments,
   onOpenEnvironmentModal,
+  showPathParams = true,
 }) => {
+  const [isBulkEdit, setIsBulkEdit] = useState(false);
+  const [bulkText, setBulkText] = useState('');
+
   const handleUpdate = (id: string, field: keyof KeyValuePair, value: any) => {
     const updated = items.map((item) => (item.id === id ? { ...item, [field]: value } : item));
     onChange(updated);
@@ -33,121 +40,267 @@ export const KeyValueEditor: React.FC<KeyValueEditorProps> = ({
     onChange(items.filter((item) => item.id !== id));
   };
 
-  const handleAdd = () => {
+  const handleToggle = (id: string) => {
+    const updated = items.map((item) => (item.id === id ? { ...item, enabled: !item.enabled } : item));
+    onChange(updated);
+  };
+
+  const handleToggleAll = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const checked = e.target.checked;
+    onChange(items.map((i) => ({ ...i, enabled: checked })));
+  };
+
+  // When typing into the new row placeholder
+  const handleAddNewRow = (field: 'key' | 'value' | 'description', val: string) => {
+    if (!val.trim() && field === 'key') return;
     const newItem: KeyValuePair = {
       id: Math.random().toString(36).substring(2, 9),
-      key: '',
-      value: '',
+      key: field === 'key' ? val : '',
+      value: field === 'value' ? val : '',
+      description: field === 'description' ? val : '',
       enabled: true,
-      description: '',
     };
     onChange([...items, newItem]);
   };
 
-  const handleToggleAll = () => {
-    const allEnabled = items.every((i) => i.enabled);
-    onChange(items.map((i) => ({ ...i, enabled: !allEnabled })));
+  const handleStartBulkEdit = () => {
+    const text = items
+      .map((item) => `${item.key || ''}:${item.value || ''}`)
+      .join('\n');
+    setBulkText(text);
+    setIsBulkEdit(true);
   };
 
+  const handleSaveBulkEdit = () => {
+    const lines = bulkText.split('\n');
+    const newItems: KeyValuePair[] = lines
+      .filter((line) => line.trim().length > 0)
+      .map((line) => {
+        const colonIndex = line.indexOf(':');
+        const key = colonIndex !== -1 ? line.slice(0, colonIndex).trim() : line.trim();
+        const value = colonIndex !== -1 ? line.slice(colonIndex + 1).trim() : '';
+        return {
+          id: Math.random().toString(36).substring(2, 9),
+          key,
+          value,
+          enabled: true,
+          description: '',
+        };
+      });
+    onChange(newItems);
+    setIsBulkEdit(false);
+  };
+
+  const allChecked = items.length > 0 && items.every((i) => i.enabled);
+  const someChecked = items.some((i) => i.enabled);
+
   return (
-    <div className="flex flex-col h-full overflow-hidden text-sm">
-      <div className="flex items-center justify-between pb-2 mb-2 border-b border-[#30363d]/50">
-        <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-          Key-Value Pairs ({items.filter((i) => i.enabled && i.key).length} active)
-        </span>
-        <div className="flex items-center gap-2">
-          {items.length > 0 && (
-            <button
-              onClick={handleToggleAll}
-              className="text-xs text-slate-400 hover:text-slate-200 transition-colors px-2 py-0.5 rounded hover:bg-[#21262d] cursor-pointer"
-            >
-              Toggle All
-            </button>
-          )}
-          <button
-            onClick={handleAdd}
-            className="flex items-center gap-1 text-xs text-sky-400 hover:text-sky-300 transition-colors px-2 py-0.5 rounded hover:bg-sky-500/10 font-medium cursor-pointer"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            Add Row
-          </button>
-        </div>
+    <div className="flex flex-col h-full overflow-y-auto px-4 py-3 select-none text-xs">
+      {/* Section Title */}
+      <div className="mb-2 flex items-center justify-between">
+        <span className="font-semibold text-xs text-[#888888]">{title}</span>
       </div>
 
-      <div className="flex-1 overflow-y-auto space-y-1.5 pr-1">
-        {items.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-8 text-center text-slate-500">
-            <p className="text-xs">No parameters configured.</p>
+      {isBulkEdit ? (
+        <div className="flex flex-col gap-2">
+          <textarea
+            value={bulkText}
+            onChange={(e) => setBulkText(e.target.value)}
+            placeholder="key:value"
+            className="w-full h-40 bg-[#1a1a1a] border border-[#333333] rounded p-2.5 font-mono text-xs text-[#cccccc] focus:outline-none focus:border-[#444444] resize-none"
+          />
+          <div className="flex items-center justify-end gap-2">
             <button
-              onClick={handleAdd}
-              className="mt-2 text-xs text-sky-400 hover:underline cursor-pointer"
+              onClick={() => setIsBulkEdit(false)}
+              className="px-2.5 py-1 text-xs rounded text-[#888888] hover:text-[#cccccc] transition-colors cursor-pointer"
             >
-              + Click to add your first parameter
+              Cancel
+            </button>
+            <button
+              onClick={handleSaveBulkEdit}
+              className="px-3 py-1 text-xs rounded bg-[#d99b26] hover:bg-[#c2871a] text-white font-medium transition-colors cursor-pointer"
+            >
+              Apply
             </button>
           </div>
-        ) : (
-          items.map((item) => (
-            <div
-              key={item.id}
-              className={`flex items-center gap-2 group p-1 rounded-md transition-colors ${
-                item.enabled ? 'bg-[#161b22]/70' : 'bg-[#161b22]/30 opacity-60'
-              } hover:bg-[#21262d]/80 border border-transparent hover:border-[#30363d]`}
+        </div>
+      ) : (
+        <>
+          {/* Bruno EditableTable */}
+          <div className="border border-[#333333] rounded overflow-clip bg-[#1a1a1a]">
+            <table className="w-full border-collapse table-fixed text-xs">
+              <thead>
+                <tr className="bg-[#1a1a1a] text-[#888888] select-none h-8">
+                  <td className="w-8 text-center border-b border-r border-[#333333] p-0">
+                    <input
+                      type="checkbox"
+                      checked={allChecked}
+                      ref={(el) => {
+                        if (el) el.indeterminate = !allChecked && someChecked;
+                      }}
+                      onChange={handleToggleAll}
+                      className="cursor-pointer accent-[#d99b26]"
+                    />
+                  </td>
+                  <td className="w-[32%] px-2.5 py-1.5 border-b border-r border-[#333333] font-normal text-[#888888]">
+                    {keyPlaceholder}
+                  </td>
+                  <td className="w-[35%] px-2.5 py-1.5 border-b border-r border-[#333333] font-normal text-[#888888]">
+                    {valuePlaceholder}
+                  </td>
+                  <td className="px-2.5 py-1.5 border-b border-r border-[#333333] font-normal text-[#888888]">
+                    {descriptionPlaceholder}
+                  </td>
+                  <td className="w-8 border-b border-[#333333] p-0"></td>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((item) => (
+                  <tr
+                    key={item.id}
+                    className="h-8 hover:bg-[#222224] transition-colors group"
+                  >
+                    <td className="w-8 text-center border-b border-r border-[#333333] p-0">
+                      <input
+                        type="checkbox"
+                        checked={item.enabled}
+                        onChange={() => handleToggle(item.id)}
+                        className="cursor-pointer accent-[#d99b26]"
+                      />
+                    </td>
+                    <td className="border-b border-r border-[#333333] p-0">
+                      <VariableInput
+                        value={item.key}
+                        onChange={(val) => handleUpdate(item.id, 'key', val)}
+                        placeholder="Name"
+                        activeEnvironment={activeEnvironment}
+                        environments={environments}
+                        onOpenEnvironmentModal={onOpenEnvironmentModal}
+                        wrapperClassName="border-0 bg-transparent rounded-none focus-within:border-0"
+                      />
+                    </td>
+                    <td className="border-b border-r border-[#333333] p-0">
+                      <VariableInput
+                        value={item.value}
+                        onChange={(val) => handleUpdate(item.id, 'value', val)}
+                        placeholder="Value"
+                        activeEnvironment={activeEnvironment}
+                        environments={environments}
+                        onOpenEnvironmentModal={onOpenEnvironmentModal}
+                        wrapperClassName="border-0 bg-transparent rounded-none focus-within:border-0"
+                      />
+                    </td>
+                    <td className="border-b border-r border-[#333333] p-0">
+                      <input
+                        type="text"
+                        value={item.description || ''}
+                        onChange={(e) => handleUpdate(item.id, 'description', e.target.value)}
+                        placeholder="Description"
+                        className="w-full bg-transparent px-2.5 py-1 text-xs text-[#cccccc] placeholder:text-[#666666] outline-none"
+                      />
+                    </td>
+                    <td className="w-8 text-center border-b border-[#333333] p-0">
+                      <button
+                        onClick={() => handleDelete(item.id)}
+                        className="p-1 text-[#666666] hover:text-rose-400 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                        title="Delete row"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+
+                {/* Always-visible Empty Row for quick inline addition (Bruno style) */}
+                <tr className="h-8 hover:bg-[#222224] transition-colors">
+                  <td className="w-8 text-center border-b border-r border-[#333333] p-0 opacity-40">
+                    <input type="checkbox" disabled className="accent-[#d99b26]" />
+                  </td>
+                  <td className="border-b border-r border-[#333333] p-0">
+                    <input
+                      type="text"
+                      placeholder="Name"
+                      onBlur={(e) => {
+                        if (e.target.value.trim()) {
+                          handleAddNewRow('key', e.target.value);
+                          e.target.value = '';
+                        }
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && e.currentTarget.value.trim()) {
+                          handleAddNewRow('key', e.currentTarget.value);
+                          e.currentTarget.value = '';
+                        }
+                      }}
+                      className="w-full bg-transparent px-2.5 py-1 text-xs text-[#cccccc] placeholder:text-[#555555] outline-none font-mono"
+                    />
+                  </td>
+                  <td className="border-b border-r border-[#333333] p-0">
+                    <input
+                      type="text"
+                      placeholder="Value"
+                      onBlur={(e) => {
+                        if (e.target.value.trim()) {
+                          handleAddNewRow('value', e.target.value);
+                          e.target.value = '';
+                        }
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && e.currentTarget.value.trim()) {
+                          handleAddNewRow('value', e.currentTarget.value);
+                          e.currentTarget.value = '';
+                        }
+                      }}
+                      className="w-full bg-transparent px-2.5 py-1 text-xs text-[#cccccc] placeholder:text-[#555555] outline-none font-mono"
+                    />
+                  </td>
+                  <td className="border-b border-r border-[#333333] p-0">
+                    <input
+                      type="text"
+                      placeholder="Description"
+                      onBlur={(e) => {
+                        if (e.target.value.trim()) {
+                          handleAddNewRow('description', e.target.value);
+                          e.target.value = '';
+                        }
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && e.currentTarget.value.trim()) {
+                          handleAddNewRow('description', e.currentTarget.value);
+                          e.currentTarget.value = '';
+                        }
+                      }}
+                      className="w-full bg-transparent px-2.5 py-1 text-xs text-[#cccccc] placeholder:text-[#555555] outline-none"
+                    />
+                  </td>
+                  <td className="w-8 border-b border-[#333333] p-0"></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          {/* Bulk Edit Button (matches Image 4) */}
+          <div className="flex justify-end mt-2">
+            <button
+              onClick={handleStartBulkEdit}
+              className="text-xs text-[#3b82f6] hover:underline cursor-pointer select-none"
             >
-              <button
-                type="button"
-                onClick={() => handleUpdate(item.id, 'enabled', !item.enabled)}
-                className="text-slate-400 hover:text-slate-200 transition-colors p-1 cursor-pointer"
-                title={item.enabled ? 'Disable parameter' : 'Enable parameter'}
-              >
-                {item.enabled ? (
-                  <CheckSquare className="w-4 h-4 text-sky-400" />
-                ) : (
-                  <Square className="w-4 h-4" />
-                )}
-              </button>
+              Bulk Edit
+            </button>
+          </div>
 
-              <div className="w-1/3">
-                <VariableInput
-                  placeholder={keyPlaceholder}
-                  value={item.key}
-                  onChange={(val) => handleUpdate(item.id, 'key', val)}
-                  activeEnvironment={activeEnvironment}
-                  environments={environments}
-                  onOpenEnvironmentModal={onOpenEnvironmentModal}
-                />
+          {/* Path Parameters Section (matches Image 4) */}
+          {showPathParams && (
+            <div className="mt-4">
+              <div className="flex items-center gap-1.5 mb-2">
+                <span className="font-semibold text-xs text-[#888888]">Path</span>
+                <HelpCircle className="w-3.5 h-3.5 text-[#666666]" title="Path variables are automatically extracted from URL patterns like :param" />
               </div>
-
-              <div className="flex-1">
-                <VariableInput
-                  placeholder={valuePlaceholder}
-                  value={item.value}
-                  onChange={(val) => handleUpdate(item.id, 'value', val)}
-                  activeEnvironment={activeEnvironment}
-                  environments={environments}
-                  onOpenEnvironmentModal={onOpenEnvironmentModal}
-                />
-              </div>
-
-              <input
-                type="text"
-                placeholder={descriptionPlaceholder}
-                value={item.description || ''}
-                onChange={(e) => handleUpdate(item.id, 'description', e.target.value)}
-                className="w-1/4 hidden md:block bg-[#0d1117] border border-[#30363d] rounded px-2.5 py-1 text-xs text-slate-400 focus:outline-none focus:border-sky-500"
-              />
-
-              <button
-                type="button"
-                onClick={() => handleDelete(item.id)}
-                className="text-slate-500 hover:text-rose-400 transition-colors p-1 rounded opacity-0 group-hover:opacity-100 cursor-pointer"
-                title="Delete parameter"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
             </div>
-          ))
-        )}
-      </div>
+          )}
+        </>
+      )}
     </div>
   );
 };
+

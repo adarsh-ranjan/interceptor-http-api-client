@@ -1,7 +1,7 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useMemo } from 'react';
 import { TEST_SNIPPETS } from '../utils/testRunner';
 import { Environment } from '../types';
-import { CheckSquare, Sparkles, Trash2, Info, Braces } from 'lucide-react';
+import { Sparkles, Trash2, Info, Braces } from 'lucide-react';
 import { VariableHoverTooltip } from './VariableHoverTooltip';
 import {
   findVariableInMultilineText,
@@ -15,6 +15,7 @@ interface TestScriptEditorProps {
   activeEnvironment?: Environment;
   environments?: Environment[];
   onOpenEnvironmentModal?: () => void;
+  mode?: 'script' | 'tests';
 }
 
 export const TestScriptEditor: React.FC<TestScriptEditorProps> = ({
@@ -23,14 +24,18 @@ export const TestScriptEditor: React.FC<TestScriptEditorProps> = ({
   activeEnvironment,
   environments,
   onOpenEnvironmentModal,
+  mode = 'script',
 }) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [showSnippets, setShowSnippets] = useState(true);
   const [hoveredVar, setHoveredVar] = useState<{
     info: VariableResolutionInfo;
     x: number;
     y: number;
   } | null>(null);
+
+  const lines = useMemo(() => (script ? script.split('\n') : ['']), [script]);
 
   useEffect(() => {
     return () => {
@@ -45,7 +50,7 @@ export const TestScriptEditor: React.FC<TestScriptEditorProps> = ({
     const style = window.getComputedStyle(textarea);
     const paddingLeft = parseFloat(style.paddingLeft) || 12;
     const paddingTop = parseFloat(style.paddingTop) || 12;
-    const lineHeight = parseFloat(style.lineHeight) || 18;
+    const lineHeight = parseFloat(style.lineHeight) || 20;
     const charWidth = 7.2;
 
     const mouseX = e.clientX - rect.left - paddingLeft + textarea.scrollLeft;
@@ -106,101 +111,107 @@ export const TestScriptEditor: React.FC<TestScriptEditorProps> = ({
     onChange(updated);
   };
 
-  const handleClear = () => {
-    onChange('');
-  };
-
   const activeVars = activeEnvironment?.variables.filter((v) => v.enabled && v.key.trim()) || [];
 
   return (
-    <div className="flex flex-col h-full overflow-hidden text-xs">
-      {/* Header bar */}
-      <div className="flex items-center justify-between pb-2 mb-2 border-b border-[#30363d]/50">
-        <div className="flex items-center gap-1.5 text-slate-400 font-semibold uppercase tracking-wider text-[11px]">
-          <CheckSquare className="w-3.5 h-3.5 text-sky-400" />
-          <span>Post-Response Test Scripts</span>
+    <div className="flex-1 flex flex-col h-full overflow-hidden text-xs bg-[#1a1a1a]">
+      <div className="flex-1 flex overflow-hidden">
+        {/* Editor Area with Line Gutter */}
+        <div className="flex-1 flex flex-col h-full overflow-hidden">
+          <div className="flex-1 flex overflow-hidden">
+            {/* Line Numbers Gutter (NO vertical line, matches Bruno) */}
+            <div className="w-10 shrink-0 pt-4 pb-4 pl-3 pr-1 select-none text-left font-mono text-xs leading-5 text-[#666666] bg-[#1a1a1a] overflow-hidden">
+              {lines.map((_, i) => (
+                <div key={i} className="h-5">
+                  {i + 1}
+                </div>
+              ))}
+            </div>
+
+            {/* Script Textarea */}
+            <div className="flex-1 relative h-full overflow-hidden">
+              <textarea
+                ref={textareaRef}
+                value={script}
+                onChange={(e) => {
+                  setHoveredVar(null);
+                  onChange(e.target.value);
+                }}
+                onMouseMove={handleMouseMove}
+                onMouseLeave={handleMouseLeave}
+                placeholder={`// Write assertions or scripts\ninterceptor.test("Status is 200", () => {\n  interceptor.expect(res.status).toBe(200);\n});`}
+                spellCheck={false}
+                className="w-full h-full pt-4 pb-4 pl-2 pr-4 font-mono text-xs leading-5 bg-transparent text-[#cccccc] resize-none outline-none selection:bg-[#d99b26]/30 caret-[#d99b26] overflow-auto"
+              />
+            </div>
+          </div>
+
+          {/* Bottom Bar: Environment Variables & Globals Info */}
+          <div className="border-t border-[#333333] bg-[#1a1a1a]">
+            {activeVars.length > 0 && (
+              <div className="px-3 py-1 border-b border-[#333333]/50 flex items-center gap-2 overflow-x-auto no-scrollbar">
+                <span className="text-[10px] text-[#888888] shrink-0 flex items-center gap-1 font-mono">
+                  <Braces className="w-3 h-3 text-[#d99b26]" />
+                  <span>Env ({activeEnvironment?.name}):</span>
+                </span>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {activeVars.map((v) => (
+                    <button
+                      key={v.id}
+                      type="button"
+                      onClick={() => handleInsertEnvGetter(v.key)}
+                      onMouseEnter={(e) => handleChipHover(e, v.key)}
+                      onMouseLeave={handleMouseLeave}
+                      className="px-1.5 py-0.2 rounded text-[10px] font-mono text-[#d99b26] bg-[#d99b26]/10 border border-[#d99b26]/30 hover:bg-[#d99b26]/20 transition-colors cursor-pointer"
+                      title={`Insert getEnvironmentVariable("${v.key}")`}
+                    >
+                      {`{{${v.key}}}`}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="px-3 py-1 text-[10px] text-[#777777] flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Info className="w-3 h-3 text-[#666666] shrink-0" />
+                <span>Globals: <code className="text-[#d99b26]">interceptor</code> (<code className="text-[#cccccc]">test</code>, <code className="text-[#cccccc]">expect</code>, <code className="text-[#cccccc]">getEnvironmentVariable</code>), <code className="text-[#d99b26]">res</code></span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowSnippets(!showSnippets)}
+                className="text-[10px] text-[#888888] hover:text-[#d99b26] transition-colors cursor-pointer"
+              >
+                {showSnippets ? 'Hide Snippets' : 'Show Snippets'}
+              </button>
+            </div>
+          </div>
         </div>
 
-        {script && (
-          <button
-            type="button"
-            onClick={handleClear}
-            className="flex items-center gap-1 text-slate-400 hover:text-rose-400 px-2 py-0.5 rounded hover:bg-[#21262d] transition-colors cursor-pointer"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-            <span>Clear</span>
-          </button>
-        )}
-      </div>
-
-      <div className="flex-1 flex overflow-hidden gap-3">
-        {/* Main Editor */}
-        <div className="flex-1 flex flex-col rounded border border-[#30363d] bg-[#0d1117] overflow-hidden relative">
-          <textarea
-            ref={textareaRef}
-            value={script}
-            onChange={(e) => {
-              setHoveredVar(null);
-              onChange(e.target.value);
-            }}
-            onMouseMove={handleMouseMove}
-            onMouseLeave={handleMouseLeave}
-            placeholder={`// Write JavaScript assertions that execute automatically after response\n// Environment variables can be accessed via interceptor.getEnvironmentVariable("key") or pm.environment.get("key")\ninterceptor.test("Status code is 200", () => {\n  interceptor.expect(res.status).toBe(200);\n});`}
-            spellCheck={false}
-            className="w-full flex-1 p-3 font-mono text-xs bg-transparent text-slate-200 resize-none focus:outline-none leading-relaxed"
-          />
-
-          {/* Environment Variables Reference Bar */}
-          {activeVars.length > 0 && (
-            <div className="px-3 py-1.5 bg-[#161b22] border-t border-[#30363d]/50 flex items-center gap-2 overflow-x-auto no-scrollbar">
-              <span className="text-[10px] text-slate-500 shrink-0 flex items-center gap-1">
-                <Braces className="w-3 h-3 text-amber-400" />
-                <span>Env ({activeEnvironment?.name}):</span>
-              </span>
-              <div className="flex items-center gap-1.5 flex-wrap">
-                {activeVars.map((v) => (
-                  <button
-                    key={v.id}
-                    type="button"
-                    onClick={() => handleInsertEnvGetter(v.key)}
-                    onMouseEnter={(e) => handleChipHover(e, v.key)}
-                    onMouseLeave={handleMouseLeave}
-                    className="px-1.5 py-0.5 rounded text-[10px] font-mono text-amber-300 bg-amber-500/10 border border-amber-500/30 hover:bg-amber-500/20 transition-colors cursor-pointer"
-                    title={`Click to insert getEnvironmentVariable("${v.key}") • Hover to preview value`}
-                  >
-                    {`{{${v.key}}}`}
-                  </button>
-                ))}
+        {/* Snippets Sidebar (Optional Collapsible Panel) */}
+        {showSnippets && (
+          <div className="w-48 bg-[#222224] border-l border-[#333333] p-2.5 flex flex-col shrink-0 select-none">
+            <div className="flex items-center justify-between text-[#cccccc] font-semibold mb-2 text-xs">
+              <div className="flex items-center gap-1">
+                <Sparkles className="w-3.5 h-3.5 text-[#d99b26]" />
+                <span>Snippets</span>
               </div>
             </div>
-          )}
 
-          <div className="px-3 py-1.5 bg-[#0d1117] border-t border-[#30363d]/40 text-[10px] text-slate-500 flex items-center gap-2">
-            <Info className="w-3 h-3 text-slate-400 shrink-0" />
-            <span>Available globals: <code className="text-sky-400">interceptor</code> (<code className="text-slate-300">test</code>, <code className="text-slate-300">expect</code>, <code className="text-slate-300">getEnvironmentVariable</code>, <code className="text-slate-300">setEnvironmentVariable</code>), <code className="text-sky-400">pm.environment</code>, and <code className="text-sky-400">res</code>.</span>
+            <div className="flex-1 overflow-y-auto space-y-1.5 no-scrollbar">
+              {TEST_SNIPPETS.map((item) => (
+                <button
+                  key={item.name}
+                  type="button"
+                  onClick={() => handleInsertSnippet(item.code)}
+                  className="w-full text-left p-1.5 rounded bg-[#1a1a1a] hover:bg-[#26292b] text-[#cccccc] hover:text-white border border-[#333333] transition-colors text-[11px] cursor-pointer"
+                >
+                  + {item.name}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
-
-        {/* Snippets Panel */}
-        <div className="w-48 bg-[#161b22] border border-[#30363d] rounded p-2.5 flex flex-col shrink-0">
-          <div className="flex items-center gap-1 text-slate-300 font-semibold mb-2">
-            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-            <span>Snippets</span>
-          </div>
-
-          <div className="flex-1 overflow-y-auto space-y-1.5">
-            {TEST_SNIPPETS.map((item) => (
-              <button
-                key={item.name}
-                type="button"
-                onClick={() => handleInsertSnippet(item.code)}
-                className="w-full text-left p-1.5 rounded bg-[#0d1117] hover:bg-[#21262d] text-slate-300 hover:text-white border border-[#30363d]/40 transition-colors text-[11px] cursor-pointer"
-              >
-                + {item.name}
-              </button>
-            ))}
-          </div>
-        </div>
+        )}
       </div>
 
       {/* Variable Hover Tooltip */}

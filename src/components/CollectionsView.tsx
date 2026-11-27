@@ -19,6 +19,7 @@ import {
   AlertTriangle,
   Search,
   X,
+  FolderTree,
 } from 'lucide-react';
 
 interface CollectionsViewProps {
@@ -57,6 +58,7 @@ export const CollectionsView: React.FC<CollectionsViewProps> = ({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [showSearch, setShowSearch] = useState(false);
 
   // Three-dot dropdown menu state
   const [activeMenu, setActiveMenu] = useState<ActiveMenuState | null>(null);
@@ -408,7 +410,7 @@ export const CollectionsView: React.FC<CollectionsViewProps> = ({
         <div key={item.id} className="select-none flex flex-col">
           {/* Folder Row */}
           <div
-            className={`group relative flex items-center justify-between py-1 px-1.5 rounded cursor-pointer transition-colors ${isMenuOpen ? 'bg-[#21262d]' : 'hover:bg-[#21262d]/70'
+            className={`group relative flex items-center justify-between py-1 px-1.5 rounded cursor-pointer transition-colors ${isMenuOpen ? 'bg-[#26292b]' : 'hover:bg-[#222224]'
               }`}
             style={{ paddingLeft: `${8 + level * 14}px` }}
           >
@@ -418,7 +420,7 @@ export const CollectionsView: React.FC<CollectionsViewProps> = ({
             >
               <button
                 type="button"
-                className="text-slate-400 group-hover:text-slate-200 transition-colors p-0.5"
+                className="text-[#888888] group-hover:text-[#cccccc] transition-colors p-0.5"
               >
                 {isOpen ? (
                   <ChevronDown className="w-3.5 h-3.5" />
@@ -440,11 +442,11 @@ export const CollectionsView: React.FC<CollectionsViewProps> = ({
                     }}
                     autoFocus
                     onFocus={(e) => e.target.select()}
-                    className="w-full bg-[#0d1117] border border-sky-500 rounded px-1.5 py-0.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-sky-500"
+                    className="w-full bg-[#1a1a1a] border border-[#d99b26] rounded px-1.5 py-0.5 text-xs text-white focus:outline-none"
                   />
                 </div>
               ) : (
-                <span className="truncate text-slate-300 font-medium text-xs group-hover:text-white">
+                <span className="truncate text-[#cccccc] font-medium text-xs group-hover:text-white">
                   {item.name}
                 </span>
               )}
@@ -463,7 +465,7 @@ export const CollectionsView: React.FC<CollectionsViewProps> = ({
                     onNewRequestInCollection(collectionId, item.id);
                     setOpenFolders((prev) => ({ ...prev, [item.id]: true }));
                   }}
-                  className="p-1 text-slate-400 hover:text-white rounded hover:bg-[#30363d] transition-colors"
+                  className="p-1 text-[#888888] hover:text-white rounded hover:bg-[#26292b] transition-colors cursor-pointer"
                   title="Add request"
                 >
                   <Plus className="w-3.5 h-3.5" />
@@ -488,9 +490,9 @@ export const CollectionsView: React.FC<CollectionsViewProps> = ({
                       });
                     }
                   }}
-                  className={`p-1 rounded transition-colors ${isMenuOpen
-                      ? 'text-white bg-[#30363d]'
-                      : 'text-slate-400 hover:text-white hover:bg-[#30363d]'
+                  className={`p-1 rounded transition-colors cursor-pointer ${isMenuOpen
+                      ? 'text-white bg-[#26292b]'
+                      : 'text-[#888888] hover:text-white hover:bg-[#26292b]'
                     }`}
                   title="More options"
                 >
@@ -505,7 +507,7 @@ export const CollectionsView: React.FC<CollectionsViewProps> = ({
             <div className="relative flex flex-col space-y-0.5 mt-0.5">
               {/* Subtle guide line */}
               <div
-                className="absolute top-0 bottom-0 border-l border-[#30363d]/40"
+                className="absolute top-0 bottom-0 border-l border-[#333333]"
                 style={{ left: `${14 + level * 14}px` }}
               />
               {item.children && item.children.length > 0 ? (
@@ -539,10 +541,10 @@ export const CollectionsView: React.FC<CollectionsViewProps> = ({
         }}
         style={{ paddingLeft: `${8 + level * 14}px` }}
         className={`group relative flex items-center justify-between py-1 px-1.5 rounded cursor-pointer transition-colors ${isSelected
-            ? 'bg-sky-500/15 text-white font-medium'
+            ? 'bg-[#222224] text-white font-medium'
             : isMenuOpen
-              ? 'bg-[#21262d]'
-              : 'hover:bg-[#21262d]/70 text-slate-300'
+              ? 'bg-[#222224]'
+              : 'hover:bg-[#222224] text-[#cccccc]'
           }`}
       >
         <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -566,7 +568,7 @@ export const CollectionsView: React.FC<CollectionsViewProps> = ({
                 }}
                 autoFocus
                 onFocus={(e) => e.target.select()}
-                className="w-full bg-[#0d1117] border border-sky-500 rounded px-1.5 py-0.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-sky-500"
+                className="w-full bg-[#1a1a1a] border border-[#d99b26] rounded px-1.5 py-0.5 text-xs text-white focus:outline-none"
               />
             </div>
           ) : (
@@ -601,9 +603,9 @@ export const CollectionsView: React.FC<CollectionsViewProps> = ({
                   });
                 }
               }}
-              className={`p-1 rounded transition-colors ${isMenuOpen
-                  ? 'text-white bg-[#30363d]'
-                  : 'text-slate-400 hover:text-white hover:bg-[#30363d]'
+              className={`p-1 rounded transition-colors cursor-pointer ${isMenuOpen
+                  ? 'text-white bg-[#26292b]'
+                  : 'text-[#888888] hover:text-white hover:bg-[#26292b]'
                 }`}
               title="More options"
             >
@@ -643,7 +645,7 @@ export const CollectionsView: React.FC<CollectionsViewProps> = ({
           left: `${left}px`,
           zIndex: 9999,
         }}
-        className="w-48 bg-[#161b22] border border-[#30363d] rounded-lg shadow-2xl py-1 text-xs select-none backdrop-blur-md animate-in fade-in zoom-in-95 duration-100"
+        className="w-48 bg-[#222224] border border-[#333333] rounded-md shadow-2xl py-1 text-xs select-none backdrop-blur-md animate-in fade-in zoom-in-95 duration-100 text-[#cccccc]"
         onClick={(e) => e.stopPropagation()}
       >
         {activeMenu.type === 'collection' && activeMenu.collection && (
@@ -654,16 +656,16 @@ export const CollectionsView: React.FC<CollectionsViewProps> = ({
                 setOpenFolders((prev) => ({ ...prev, [activeMenu.collectionId]: true }));
                 setActiveMenu(null);
               }}
-              className="w-full flex items-center gap-2.5 px-3 py-1.5 text-slate-200 hover:bg-[#21262d] hover:text-white text-left transition-colors"
+              className="w-full flex items-center gap-2.5 px-3 py-1.5 text-[#cccccc] hover:bg-[#26292b] hover:text-white text-left transition-colors"
             >
-              <Plus className="w-3.5 h-3.5 text-sky-400" />
+              <Plus className="w-3.5 h-3.5 text-[#d99b26]" />
               <span>Add Request</span>
             </button>
             <button
               onClick={() => handleCreateFolder(activeMenu.collectionId)}
-              className="w-full flex items-center gap-2.5 px-3 py-1.5 text-slate-200 hover:bg-[#21262d] hover:text-white text-left transition-colors"
+              className="w-full flex items-center gap-2.5 px-3 py-1.5 text-[#cccccc] hover:bg-[#26292b] hover:text-white text-left transition-colors"
             >
-              <FolderPlus className="w-3.5 h-3.5 text-amber-400" />
+              <FolderPlus className="w-3.5 h-3.5 text-[#d99b26]" />
               <span>Add Folder</span>
             </button>
             <button
@@ -671,37 +673,37 @@ export const CollectionsView: React.FC<CollectionsViewProps> = ({
                 onRunCollection(activeMenu.collection!);
                 setActiveMenu(null);
               }}
-              className="w-full flex items-center gap-2.5 px-3 py-1.5 text-emerald-400 hover:bg-[#21262d] text-left transition-colors"
+              className="w-full flex items-center gap-2.5 px-3 py-1.5 text-emerald-400 hover:bg-[#26292b] text-left transition-colors"
             >
               <Play className="w-3.5 h-3.5 fill-current" />
               <span>Run Collection</span>
             </button>
 
-            <div className="border-t border-[#30363d]/60 my-1" />
+            <div className="border-t border-[#333333] my-1" />
 
             <button
               onClick={() => handleStartRename(activeMenu.collectionId, activeMenu.name)}
-              className="w-full flex items-center gap-2.5 px-3 py-1.5 text-slate-300 hover:bg-[#21262d] hover:text-white text-left transition-colors"
+              className="w-full flex items-center gap-2.5 px-3 py-1.5 text-[#cccccc] hover:bg-[#26292b] hover:text-white text-left transition-colors"
             >
-              <Edit2 className="w-3.5 h-3.5 text-slate-400" />
+              <Edit2 className="w-3.5 h-3.5 text-[#888888]" />
               <span>Rename</span>
             </button>
             <button
               onClick={() => handleExport(activeMenu.collection!, 'postman')}
-              className="w-full flex items-center gap-2.5 px-3 py-1.5 text-slate-300 hover:bg-[#21262d] hover:text-white text-left transition-colors"
+              className="w-full flex items-center gap-2.5 px-3 py-1.5 text-[#cccccc] hover:bg-[#26292b] hover:text-white text-left transition-colors"
             >
-              <Download className="w-3.5 h-3.5 text-sky-400" />
+              <Download className="w-3.5 h-3.5 text-[#888888]" />
               <span>Export (Postman v2.1)</span>
             </button>
             <button
               onClick={() => handleExport(activeMenu.collection!, 'interceptor')}
-              className="w-full flex items-center gap-2.5 px-3 py-1.5 text-slate-300 hover:bg-[#21262d] hover:text-white text-left transition-colors"
+              className="w-full flex items-center gap-2.5 px-3 py-1.5 text-[#cccccc] hover:bg-[#26292b] hover:text-white text-left transition-colors"
             >
               <FileCode className="w-3.5 h-3.5 text-emerald-400" />
               <span>Export (Interceptor)</span>
             </button>
 
-            <div className="border-t border-[#30363d]/60 my-1" />
+            <div className="border-t border-[#333333] my-1" />
 
             <button
               onClick={() => {
@@ -724,30 +726,30 @@ export const CollectionsView: React.FC<CollectionsViewProps> = ({
                 setOpenFolders((prev) => ({ ...prev, [activeMenu.itemId!]: true }));
                 setActiveMenu(null);
               }}
-              className="w-full flex items-center gap-2.5 px-3 py-1.5 text-slate-200 hover:bg-[#21262d] hover:text-white text-left transition-colors"
+              className="w-full flex items-center gap-2.5 px-3 py-1.5 text-[#cccccc] hover:bg-[#26292b] hover:text-white text-left transition-colors cursor-pointer"
             >
-              <Plus className="w-3.5 h-3.5 text-sky-400" />
+              <Plus className="w-3.5 h-3.5 text-[#d99b26]" />
               <span>Add Request</span>
             </button>
             <button
               onClick={() => handleCreateFolder(activeMenu.collectionId, activeMenu.itemId)}
-              className="w-full flex items-center gap-2.5 px-3 py-1.5 text-slate-200 hover:bg-[#21262d] hover:text-white text-left transition-colors"
+              className="w-full flex items-center gap-2.5 px-3 py-1.5 text-[#cccccc] hover:bg-[#26292b] hover:text-white text-left transition-colors cursor-pointer"
             >
-              <FolderPlus className="w-3.5 h-3.5 text-amber-400" />
+              <FolderPlus className="w-3.5 h-3.5 text-[#d99b26]" />
               <span>Add Subfolder</span>
             </button>
 
-            <div className="border-t border-[#30363d]/60 my-1" />
+            <div className="border-t border-[#333333] my-1" />
 
             <button
               onClick={() => handleStartRename(activeMenu.itemId!, activeMenu.name)}
-              className="w-full flex items-center gap-2.5 px-3 py-1.5 text-slate-300 hover:bg-[#21262d] hover:text-white text-left transition-colors"
+              className="w-full flex items-center gap-2.5 px-3 py-1.5 text-[#cccccc] hover:bg-[#26292b] hover:text-white text-left transition-colors cursor-pointer"
             >
-              <Edit2 className="w-3.5 h-3.5 text-slate-400" />
+              <Edit2 className="w-3.5 h-3.5 text-[#888888]" />
               <span>Rename</span>
             </button>
 
-            <div className="border-t border-[#30363d]/60 my-1" />
+            <div className="border-t border-[#333333] my-1" />
 
             <button
               onClick={() => {
@@ -759,7 +761,7 @@ export const CollectionsView: React.FC<CollectionsViewProps> = ({
                 });
                 setActiveMenu(null);
               }}
-              className="w-full flex items-center gap-2.5 px-3 py-1.5 text-rose-400 hover:bg-rose-500/10 hover:text-rose-300 text-left font-medium transition-colors"
+              className="w-full flex items-center gap-2.5 px-3 py-1.5 text-rose-400 hover:bg-rose-500/10 hover:text-rose-300 text-left font-medium transition-colors cursor-pointer"
             >
               <Trash2 className="w-3.5 h-3.5" />
               <span>Delete Folder</span>
@@ -771,20 +773,20 @@ export const CollectionsView: React.FC<CollectionsViewProps> = ({
           <>
             <button
               onClick={() => handleDuplicateItem(activeMenu.collectionId, activeMenu.itemId!)}
-              className="w-full flex items-center gap-2.5 px-3 py-1.5 text-slate-200 hover:bg-[#21262d] hover:text-white text-left transition-colors"
+              className="w-full flex items-center gap-2.5 px-3 py-1.5 text-[#cccccc] hover:bg-[#26292b] hover:text-white text-left transition-colors cursor-pointer"
             >
-              <Copy className="w-3.5 h-3.5 text-sky-400" />
+              <Copy className="w-3.5 h-3.5 text-white" />
               <span>Duplicate</span>
             </button>
             <button
               onClick={() => handleStartRename(activeMenu.itemId!, activeMenu.name)}
-              className="w-full flex items-center gap-2.5 px-3 py-1.5 text-slate-300 hover:bg-[#21262d] hover:text-white text-left transition-colors"
+              className="w-full flex items-center gap-2.5 px-3 py-1.5 text-[#cccccc] hover:bg-[#26292b] hover:text-white text-left transition-colors cursor-pointer"
             >
-              <Edit2 className="w-3.5 h-3.5 text-slate-400" />
+              <Edit2 className="w-3.5 h-3.5 text-[#888888]" />
               <span>Rename</span>
             </button>
 
-            <div className="border-t border-[#30363d]/60 my-1" />
+            <div className="border-t border-[#333333] my-1" />
 
             <button
               onClick={() => {
@@ -809,54 +811,58 @@ export const CollectionsView: React.FC<CollectionsViewProps> = ({
   };
 
   return (
-    <div className="flex flex-col h-full text-xs bg-[#161b22] select-none">
-      {/* Action Header */}
-      <div className="flex items-center justify-between px-3 py-2.5 border-b border-[#30363d]/50 bg-[#161b22]">
-        <div className="flex items-center gap-1.5">
-          <span className="text-[11px] font-semibold text-slate-300 tracking-wider uppercase">
-            Collections
-          </span>
-          <span className="text-[10px] text-slate-500 font-mono bg-[#21262d] px-1.5 py-0.2 rounded-full">
-            {collections.length}
-          </span>
+    <div className="flex flex-col h-full text-xs bg-[#1a1a1a] select-none">
+      {/* Bruno Collections Sidebar Header (matches Image 4) */}
+      <div className="flex items-center justify-between px-3 h-9 border-b border-[#333333] bg-[#1a1a1a] shrink-0">
+        <div className="flex items-center gap-2 text-xs font-semibold text-[#cccccc]">
+          <FolderTree className="w-3.5 h-3.5 text-[#d99b26]" />
+          <span>Collections</span>
         </div>
 
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-0.5 text-[#888888]">
           <button
-            onClick={handleImport}
-            className="flex items-center gap-1 text-[11px] text-slate-400 hover:text-sky-400 px-2 py-1 rounded hover:bg-[#21262d] transition-colors"
-            title="Import collection (Postman / Interceptor)"
+            onClick={() => setShowSearch(!showSearch)}
+            className={`p-1 rounded hover:text-white hover:bg-[#26292b] transition-colors cursor-pointer ${
+              showSearch ? 'text-[#d99b26] bg-[#26292b]' : ''
+            }`}
+            title="Search collections"
           >
-            <Upload className="w-3 h-3" />
-            <span>Import</span>
+            <Search className="w-3.5 h-3.5" />
           </button>
           <button
             onClick={handleCreateCollection}
-            className="flex items-center gap-1 text-[11px] text-sky-400 hover:text-sky-300 px-2 py-1 rounded hover:bg-sky-500/10 font-medium transition-colors"
-            title="Create new collection"
+            className="p-1 rounded hover:text-white hover:bg-[#26292b] transition-colors cursor-pointer"
+            title="New collection"
           >
             <Plus className="w-3.5 h-3.5" />
-            <span>New</span>
+          </button>
+          <button
+            onClick={handleImport}
+            className="p-1 rounded hover:text-white hover:bg-[#26292b] transition-colors cursor-pointer"
+            title="Import collection"
+          >
+            <MoreHorizontal className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
 
-      {/* Filter / Search Bar */}
-      {collections.length > 0 && (
-        <div className="px-2 py-1.5 border-b border-[#30363d]/30">
+      {/* Filter / Search Bar (collapsible or when query exists) */}
+      {(showSearch || searchQuery) && (
+        <div className="px-2 py-1.5 border-b border-[#333333] bg-[#1a1a1a]">
           <div className="relative flex items-center">
-            <Search className="w-3 h-3 absolute left-2 text-slate-500 pointer-events-none" />
+            <Search className="w-3 h-3 absolute left-2 text-[#777777] pointer-events-none" />
             <input
               type="text"
+              autoFocus
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search collections..."
-              className="w-full bg-[#0d1117] border border-[#30363d]/60 rounded pl-7 pr-6 py-1 text-[11px] text-slate-200 placeholder-slate-500 focus:outline-none focus:border-sky-500"
+              className="w-full bg-[#222224] border border-[#333333] rounded pl-7 pr-6 py-1 text-[11px] text-[#cccccc] placeholder-[#666666] focus:outline-none focus:border-[#444444]"
             />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
-                className="absolute right-2 text-slate-500 hover:text-slate-300"
+                className="absolute right-2 text-[#777777] hover:text-white"
               >
                 <X className="w-3 h-3" />
               </button>
@@ -866,23 +872,23 @@ export const CollectionsView: React.FC<CollectionsViewProps> = ({
       )}
 
       {/* Collections Tree List */}
-      <div className="flex-1 overflow-y-auto px-1.5 py-1.5 space-y-0.5">
+      <div className="flex-1 overflow-y-auto px-1.5 py-1.5 space-y-0.5 bg-[#1a1a1a]">
         {collections.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12 text-center text-slate-500 px-4">
-            <p className="text-xs font-medium text-slate-400">No collections yet</p>
-            <p className="text-[11px] text-slate-500 mt-1 max-w-[200px] leading-relaxed">
+          <div className="flex flex-col items-center justify-center py-12 text-center text-[#777777] px-4">
+            <p className="text-xs font-medium text-[#cccccc]">No collections yet</p>
+            <p className="text-[11px] text-[#777777] mt-1 max-w-[200px] leading-relaxed">
               Organize your requests in folders, or import from Postman.
             </p>
             <div className="flex items-center gap-2 mt-4">
               <button
                 onClick={handleCreateCollection}
-                className="px-3 py-1.5 bg-sky-600 hover:bg-sky-500 text-white rounded font-medium text-xs transition-colors shadow-sm"
+                className="px-3 py-1.5 bg-[#d99b26] hover:bg-[#c48b20] text-white rounded font-medium text-xs transition-colors shadow-xs"
               >
                 + New Collection
               </button>
               <button
                 onClick={handleImport}
-                className="px-3 py-1.5 bg-[#21262d] hover:bg-[#30363d] text-slate-300 rounded text-xs transition-colors"
+                className="px-3 py-1.5 bg-[#26292b] hover:bg-[#2e3235] text-[#cccccc] hover:text-white rounded text-xs transition-colors"
               >
                 Import
               </button>
@@ -903,7 +909,7 @@ export const CollectionsView: React.FC<CollectionsViewProps> = ({
               <div key={col.id} className="select-none flex flex-col mb-0.5">
                 {/* Collection Root Row */}
                 <div
-                  className={`group relative flex items-center justify-between py-1 px-1.5 rounded cursor-pointer transition-colors ${isMenuOpen ? 'bg-[#21262d]' : 'hover:bg-[#21262d]/70'
+                  className={`group relative flex items-center justify-between py-1 px-1.5 rounded cursor-pointer transition-colors ${isMenuOpen ? 'bg-[#26292b]' : 'hover:bg-[#222224]'
                     }`}
                 >
                   <div
@@ -912,7 +918,7 @@ export const CollectionsView: React.FC<CollectionsViewProps> = ({
                   >
                     <button
                       type="button"
-                      className="text-slate-400 group-hover:text-slate-200 transition-colors p-0.5"
+                      className="text-[#888888] group-hover:text-[#cccccc] transition-colors p-0.5 cursor-pointer"
                     >
                       {isColOpen ? (
                         <ChevronDown className="w-3.5 h-3.5" />
@@ -934,7 +940,7 @@ export const CollectionsView: React.FC<CollectionsViewProps> = ({
                           }}
                           autoFocus
                           onFocus={(e) => e.target.select()}
-                          className="w-full bg-[#0d1117] border border-sky-500 rounded px-1.5 py-0.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-sky-500"
+                          className="w-full bg-[#1a1a1a] border border-[#d99b26] rounded px-1.5 py-0.5 text-xs text-white focus:outline-none"
                         />
                       </div>
                     ) : (
@@ -962,7 +968,7 @@ export const CollectionsView: React.FC<CollectionsViewProps> = ({
                           onNewRequestInCollection(col.id);
                           setOpenFolders((prev) => ({ ...prev, [col.id]: true }));
                         }}
-                        className="p-1 text-slate-400 hover:text-white rounded hover:bg-[#30363d] transition-colors"
+                        className="p-1 text-[#888888] hover:text-white rounded hover:bg-[#26292b] transition-colors cursor-pointer"
                         title="Add request"
                       >
                         <Plus className="w-3.5 h-3.5" />
@@ -986,9 +992,9 @@ export const CollectionsView: React.FC<CollectionsViewProps> = ({
                             });
                           }
                         }}
-                        className={`p-1 rounded transition-colors ${isMenuOpen
-                            ? 'text-white bg-[#30363d]'
-                            : 'text-slate-400 hover:text-white hover:bg-[#30363d]'
+                        className={`p-1 rounded transition-colors cursor-pointer ${isMenuOpen
+                            ? 'text-white bg-[#26292b]'
+                            : 'text-[#888888] hover:text-white hover:bg-[#26292b]'
                           }`}
                         title="More options"
                       >
@@ -1002,7 +1008,7 @@ export const CollectionsView: React.FC<CollectionsViewProps> = ({
                 {isColOpen && (
                   <div className="relative flex flex-col space-y-0.5 mt-0.5">
                     {/* Subtle hierarchy guide line */}
-                    <div className="absolute top-0 bottom-0 left-[14px] border-l border-[#30363d]/40" />
+                    <div className="absolute top-0 bottom-0 left-[14px] border-l border-[#333333]" />
 
                     {col.items.length === 0 ? (
                       <p className="text-[11px] text-slate-500 italic py-1 pl-6">
@@ -1025,29 +1031,29 @@ export const CollectionsView: React.FC<CollectionsViewProps> = ({
       {/* Delete Collection Confirmation Modal */}
       {collectionToDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
-          <div className="w-full max-w-sm bg-[#161b22] border border-[#30363d] rounded-lg shadow-2xl p-4 text-xs">
+          <div className="w-full max-w-sm bg-[#222224] border border-[#333333] rounded-lg shadow-2xl p-4 text-xs">
             <div className="flex items-center gap-2 text-rose-400 font-semibold mb-2">
               <AlertTriangle className="w-4 h-4" />
               <span>Delete Collection</span>
             </div>
-            <p className="text-slate-300 leading-relaxed">
+            <p className="text-[#cccccc] leading-relaxed">
               Are you sure you want to delete <strong className="text-white">"{collectionToDelete.name}"</strong>?
             </p>
-            <p className="text-slate-400 text-[11px] mt-1">
+            <p className="text-[#888888] text-[11px] mt-1">
               All {collectionToDelete.items.length} requests and folders within this collection will be permanently removed.
             </p>
-            <div className="flex items-center justify-end gap-2 mt-4 pt-3 border-t border-[#30363d]">
+            <div className="flex items-center justify-end gap-2 mt-4 pt-3 border-t border-[#333333]">
               <button
                 type="button"
                 onClick={() => setCollectionToDelete(null)}
-                className="px-3 py-1.5 rounded text-slate-400 hover:text-white hover:bg-[#21262d] transition-colors"
+                className="px-3 py-1.5 rounded text-[#888888] hover:text-white hover:bg-[#26292b] transition-colors cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={confirmDeleteCollection}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-rose-600 hover:bg-rose-500 text-white font-medium shadow-sm transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-rose-600 hover:bg-rose-500 text-white font-medium shadow-sm transition-colors cursor-pointer"
               >
                 <Trash2 className="w-3.5 h-3.5" />
                 <span>Delete Collection</span>
@@ -1060,26 +1066,26 @@ export const CollectionsView: React.FC<CollectionsViewProps> = ({
       {/* Delete Item (Request/Folder) Confirmation Modal */}
       {itemToDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
-          <div className="w-full max-w-sm bg-[#161b22] border border-[#30363d] rounded-lg shadow-2xl p-4 text-xs">
+          <div className="w-full max-w-sm bg-[#222224] border border-[#333333] rounded-lg shadow-2xl p-4 text-xs">
             <div className="flex items-center gap-2 text-rose-400 font-semibold mb-2">
               <AlertTriangle className="w-4 h-4" />
               <span>Delete {itemToDelete.isFolder ? 'Folder' : 'Request'}</span>
             </div>
-            <p className="text-slate-300 leading-relaxed">
+            <p className="text-[#cccccc] leading-relaxed">
               Are you sure you want to delete <strong className="text-white">"{itemToDelete.itemName}"</strong>?
             </p>
-            <div className="flex items-center justify-end gap-2 mt-4 pt-3 border-t border-[#30363d]">
+            <div className="flex items-center justify-end gap-2 mt-4 pt-3 border-t border-[#333333]">
               <button
                 type="button"
                 onClick={() => setItemToDelete(null)}
-                className="px-3 py-1.5 rounded text-slate-400 hover:text-white hover:bg-[#21262d] transition-colors"
+                className="px-3 py-1.5 rounded text-[#888888] hover:text-white hover:bg-[#26292b] transition-colors cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={confirmDeleteItem}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-rose-600 hover:bg-rose-500 text-white font-medium shadow-sm transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-rose-600 hover:bg-rose-500 text-white font-medium shadow-sm transition-colors cursor-pointer"
               >
                 <Trash2 className="w-3.5 h-3.5" />
                 <span>Delete</span>

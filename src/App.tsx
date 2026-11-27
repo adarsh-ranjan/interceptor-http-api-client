@@ -27,6 +27,8 @@ import { runTestScript } from './utils/testRunner';
 import { RequestBar } from './components/RequestBar';
 import { KeyValueEditor } from './components/KeyValueEditor';
 import { BodyEditor } from './components/BodyEditor';
+import { RequestBodyModeDropdown } from './components/RequestBodyModeDropdown';
+import { InterceptorLogo } from './components/InterceptorLogo';
 import { AuthEditor } from './components/AuthEditor';
 import { TestScriptEditor } from './components/TestScriptEditor';
 import { ResponseViewer } from './components/ResponseViewer';
@@ -40,7 +42,25 @@ import { CollectionRunnerModal } from './components/CollectionRunnerModal';
 import { WebSocketWorkbench } from './components/WebSocketWorkbench';
 import { Toast, ToastData } from './components/Toast';
 import { ParsedCurlResult } from './utils/curlParser';
-import { Shield, CheckSquare, Radio } from 'lucide-react';
+import {
+  Shield,
+  CheckSquare,
+  Radio,
+  Columns2,
+  Rows2,
+  RotateCcw,
+  PanelLeft,
+  Box,
+  ChevronDown,
+  GitFork,
+  MoreHorizontal,
+  Settings,
+  Key,
+  Sparkles,
+  Search,
+  Cookie,
+  Terminal,
+} from 'lucide-react';
 
 const DEFAULT_REQUEST: HttpRequest = {
   id: 'req-initial',
@@ -205,7 +225,7 @@ export const App: React.FC = () => {
 
   // Sidebar & Layout State
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const [configSubTab, setConfigSubTab] = useState<'params' | 'auth' | 'headers' | 'body' | 'tests'>('params');
+  const [configSubTab, setConfigSubTab] = useState<'params' | 'auth' | 'headers' | 'body' | 'vars' | 'script' | 'assert' | 'tests'>('params');
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
   const [isEnvModalOpen, setIsEnvModalOpen] = useState(false);
   const [isCodeModalOpen, setIsCodeModalOpen] = useState(false);
@@ -357,6 +377,116 @@ export const App: React.FC = () => {
     }
   });
 
+  // Flexible & Customizable Layout State
+  const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('interceptor_sidebar_width');
+      return saved ? Math.max(180, Math.min(550, parseInt(saved, 10))) : 260;
+    } catch {
+      return 260;
+    }
+  });
+
+  const [workbenchLayout, setWorkbenchLayout] = useState<'horizontal' | 'vertical'>(() => {
+    try {
+      const saved = localStorage.getItem('interceptor_workbench_layout');
+      return saved === 'vertical' ? 'vertical' : 'horizontal';
+    } catch {
+      return 'horizontal';
+    }
+  });
+
+  const [editorRatio, setEditorRatio] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('interceptor_editor_ratio');
+      return saved ? Math.max(0.2, Math.min(0.8, parseFloat(saved))) : 0.5;
+    } catch {
+      return 0.5;
+    }
+  });
+
+  const [isDraggingSidebar, setIsDraggingSidebar] = useState(false);
+  const [isDraggingEditor, setIsDraggingEditor] = useState(false);
+  const workbenchContainerRef = useRef<HTMLDivElement>(null);
+
+  // Persistence for layout
+  useEffect(() => {
+    try {
+      localStorage.setItem('interceptor_sidebar_width', sidebarWidth.toString());
+    } catch {
+      // ignore
+    }
+  }, [sidebarWidth]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('interceptor_workbench_layout', workbenchLayout);
+    } catch {
+      // ignore
+    }
+  }, [workbenchLayout]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('interceptor_editor_ratio', editorRatio.toString());
+    } catch {
+      // ignore
+    }
+  }, [editorRatio]);
+
+  // Sidebar Drag Resizing
+  const handleStartSidebarResize = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsDraggingSidebar(true);
+    const startX = e.clientX;
+    const startWidth = sidebarWidth;
+
+    const onMouseMove = (moveEvent: MouseEvent) => {
+      const newWidth = Math.max(180, Math.min(550, startWidth + (moveEvent.clientX - startX)));
+      setSidebarWidth(newWidth);
+    };
+
+    const onMouseUp = () => {
+      setIsDraggingSidebar(false);
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+    };
+
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+  }, [sidebarWidth]);
+
+  // Editor vs Response Splitter Drag Resizing
+  const handleStartEditorResize = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsDraggingEditor(true);
+    const container = workbenchContainerRef.current;
+    if (!container) return;
+
+    const rect = container.getBoundingClientRect();
+
+    const onMouseMove = (moveEvent: MouseEvent) => {
+      if (workbenchLayout === 'horizontal') {
+        const relativeX = moveEvent.clientX - rect.left;
+        const ratio = Math.max(0.2, Math.min(0.8, relativeX / rect.width));
+        setEditorRatio(ratio);
+      } else {
+        const relativeY = moveEvent.clientY - rect.top;
+        const ratio = Math.max(0.2, Math.min(0.8, relativeY / rect.height));
+        setEditorRatio(ratio);
+      }
+    };
+
+    const onMouseUp = () => {
+      setIsDraggingEditor(false);
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+    };
+
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+  }, [workbenchLayout]);
+
   const activeTab = tabs.find((t) => t.id === activeTabId) || tabs[0];
   const activeEnvironment = environments.find((e) => e.id === activeEnvId);
 
@@ -369,8 +499,8 @@ export const App: React.FC = () => {
             let updatedTitle = updatedReq.name && updatedReq.name !== 'New Request'
               ? updatedReq.name
               : updatedReq.url
-              ? updatedReq.url.replace(/^https?:\/\//, '').split('?')[0].slice(-24)
-              : 'New Request';
+                ? updatedReq.url.replace(/^https?:\/\//, '').split('?')[0].slice(-24)
+                : 'New Request';
             return {
               ...tab,
               title: `${updatedReq.method} ${updatedTitle}`,
@@ -528,6 +658,18 @@ export const App: React.FC = () => {
       ...prev,
       bodyContent: content,
     }));
+  };
+
+  const handlePrettifyBody = () => {
+    const raw = activeTab.request.bodyContent;
+    if (!raw || !raw.trim()) return;
+    try {
+      const parsed = JSON.parse(raw);
+      handleBodyContentChange(JSON.stringify(parsed, null, 2));
+      showToast({ type: 'success', title: 'Formatted JSON', message: 'Indented with 2 spaces' });
+    } catch {
+      showToast({ type: 'error', title: 'Unable to Prettify', message: 'Invalid JSON format' });
+    }
   };
 
   const handleFormDataChange = (formData: FormDataItem[]) => {
@@ -761,11 +903,11 @@ export const App: React.FC = () => {
         prev.map((tab) =>
           tab.id === activeTabId
             ? {
-                ...tab,
-                title: `${populatedReq.method} ${populatedReq.name || 'Request'}`,
-                request: populatedReq,
-                isDirty: false,
-              }
+              ...tab,
+              title: `${populatedReq.method} ${populatedReq.name || 'Request'}`,
+              request: populatedReq,
+              isDirty: false,
+            }
             : tab
         )
       );
@@ -786,20 +928,20 @@ export const App: React.FC = () => {
       prev.map((t) =>
         t.id === tabId
           ? {
-              ...t,
-              wsUrl: url,
-              wsStatus: 'connecting',
-              wsMessages: [
-                ...(t.wsMessages || []),
-                {
-                  id: Math.random().toString(36).substring(2, 9),
-                  timestamp: Date.now(),
-                  type: 'system',
-                  data: `Connecting to ${url}...`,
-                  sizeBytes: 0,
-                },
-              ],
-            }
+            ...t,
+            wsUrl: url,
+            wsStatus: 'connecting',
+            wsMessages: [
+              ...(t.wsMessages || []),
+              {
+                id: Math.random().toString(36).substring(2, 9),
+                timestamp: Date.now(),
+                type: 'system',
+                data: `Connecting to ${url}...`,
+                sizeBytes: 0,
+              },
+            ],
+          }
           : t
       )
     );
@@ -813,19 +955,19 @@ export const App: React.FC = () => {
           prev.map((t) =>
             t.id === tabId
               ? {
-                  ...t,
-                  wsStatus: 'connected',
-                  wsMessages: [
-                    ...(t.wsMessages || []),
-                    {
-                      id: Math.random().toString(36).substring(2, 9),
-                      timestamp: Date.now(),
-                      type: 'system',
-                      data: `Connected to ${url}`,
-                      sizeBytes: 0,
-                    },
-                  ],
-                }
+                ...t,
+                wsStatus: 'connected',
+                wsMessages: [
+                  ...(t.wsMessages || []),
+                  {
+                    id: Math.random().toString(36).substring(2, 9),
+                    timestamp: Date.now(),
+                    type: 'system',
+                    data: `Connected to ${url}`,
+                    sizeBytes: 0,
+                  },
+                ],
+              }
               : t
           )
         );
@@ -837,18 +979,18 @@ export const App: React.FC = () => {
           prev.map((t) =>
             t.id === tabId
               ? {
-                  ...t,
-                  wsMessages: [
-                    ...(t.wsMessages || []),
-                    {
-                      id: Math.random().toString(36).substring(2, 9),
-                      timestamp: Date.now(),
-                      type: 'received',
-                      data: dataStr,
-                      sizeBytes: new Blob([dataStr]).size,
-                    },
-                  ],
-                }
+                ...t,
+                wsMessages: [
+                  ...(t.wsMessages || []),
+                  {
+                    id: Math.random().toString(36).substring(2, 9),
+                    timestamp: Date.now(),
+                    type: 'received',
+                    data: dataStr,
+                    sizeBytes: new Blob([dataStr]).size,
+                  },
+                ],
+              }
               : t
           )
         );
@@ -859,19 +1001,19 @@ export const App: React.FC = () => {
           prev.map((t) =>
             t.id === tabId
               ? {
-                  ...t,
-                  wsStatus: 'error',
-                  wsMessages: [
-                    ...(t.wsMessages || []),
-                    {
-                      id: Math.random().toString(36).substring(2, 9),
-                      timestamp: Date.now(),
-                      type: 'system',
-                      data: 'WebSocket error occurred',
-                      sizeBytes: 0,
-                    },
-                  ],
-                }
+                ...t,
+                wsStatus: 'error',
+                wsMessages: [
+                  ...(t.wsMessages || []),
+                  {
+                    id: Math.random().toString(36).substring(2, 9),
+                    timestamp: Date.now(),
+                    type: 'system',
+                    data: 'WebSocket error occurred',
+                    sizeBytes: 0,
+                  },
+                ],
+              }
               : t
           )
         );
@@ -882,19 +1024,19 @@ export const App: React.FC = () => {
           prev.map((t) =>
             t.id === tabId
               ? {
-                  ...t,
-                  wsStatus: 'disconnected',
-                  wsMessages: [
-                    ...(t.wsMessages || []),
-                    {
-                      id: Math.random().toString(36).substring(2, 9),
-                      timestamp: Date.now(),
-                      type: 'system',
-                      data: 'Connection closed',
-                      sizeBytes: 0,
-                    },
-                  ],
-                }
+                ...t,
+                wsStatus: 'disconnected',
+                wsMessages: [
+                  ...(t.wsMessages || []),
+                  {
+                    id: Math.random().toString(36).substring(2, 9),
+                    timestamp: Date.now(),
+                    type: 'system',
+                    data: 'Connection closed',
+                    sizeBytes: 0,
+                  },
+                ],
+              }
               : t
           )
         );
@@ -905,19 +1047,19 @@ export const App: React.FC = () => {
         prev.map((t) =>
           t.id === tabId
             ? {
-                ...t,
-                wsStatus: 'error',
-                wsMessages: [
-                  ...(t.wsMessages || []),
-                  {
-                    id: Math.random().toString(36).substring(2, 9),
-                    timestamp: Date.now(),
-                    type: 'system',
-                    data: `Failed to connect: ${err.message}`,
-                    sizeBytes: 0,
-                  },
-                ],
-              }
+              ...t,
+              wsStatus: 'error',
+              wsMessages: [
+                ...(t.wsMessages || []),
+                {
+                  id: Math.random().toString(36).substring(2, 9),
+                  timestamp: Date.now(),
+                  type: 'system',
+                  data: `Failed to connect: ${err.message}`,
+                  sizeBytes: 0,
+                },
+              ],
+            }
             : t
         )
       );
@@ -943,18 +1085,18 @@ export const App: React.FC = () => {
         prev.map((t) =>
           t.id === activeTabId
             ? {
-                ...t,
-                wsMessages: [
-                  ...(t.wsMessages || []),
-                  {
-                    id: Math.random().toString(36).substring(2, 9),
-                    timestamp: Date.now(),
-                    type: 'sent',
-                    data: text,
-                    sizeBytes: new Blob([text]).size,
-                  },
-                ],
-              }
+              ...t,
+              wsMessages: [
+                ...(t.wsMessages || []),
+                {
+                  id: Math.random().toString(36).substring(2, 9),
+                  timestamp: Date.now(),
+                  type: 'sent',
+                  data: text,
+                  sizeBytes: new Blob([text]).size,
+                },
+              ],
+            }
             : t
         )
       );
@@ -1088,11 +1230,11 @@ export const App: React.FC = () => {
       prev.map((t) =>
         t.id === activeTabId
           ? {
-              ...t,
-              title: `${savedRequest.method} ${savedRequest.name}`,
-              request: savedRequest,
-              isDirty: false,
-            }
+            ...t,
+            title: `${savedRequest.method} ${savedRequest.name}`,
+            request: savedRequest,
+            isDirty: false,
+          }
           : t
       )
     );
@@ -1180,6 +1322,10 @@ export const App: React.FC = () => {
           handleCloseTab(activeTabId);
         }
       }
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'b') {
+        e.preventDefault();
+        setIsSidebarCollapsed((prev) => !prev);
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
@@ -1193,74 +1339,186 @@ export const App: React.FC = () => {
   ).length;
   const authSummary = getAuthSummary(activeTab.request.auth);
 
+  // Active collection for Bruno-style CollectionHeader badge
+  const activeCollection = collections.find((col) =>
+    col.items.some((item) =>
+      item.type === 'request'
+        ? item.request.id === activeTab.request.id || item.id === activeTab.request.itemId
+        : item.children?.some((child) => child.request.id === activeTab.request.id || child.id === activeTab.request.itemId)
+    )
+  ) || collections[0];
+  const activeCollectionName = activeCollection?.name;
+
   return (
-    <div className="flex flex-col h-screen w-screen overflow-hidden bg-[#0d1117] text-[#e6edf3]">
-      {/* Top Window Titlebar Header (Spans full window width, accommodates macOS traffic lights) */}
+    <div className="flex flex-col h-screen w-screen overflow-hidden bg-[#1a1a1a] text-[#cccccc]">
+      {/* Top Window Titlebar Header (Spans full window width, Bruno-style dark seamless titlebar) */}
       <header
-        className="relative h-10 bg-[#0d1117] border-b border-[#30363d] flex items-center justify-between px-3 select-none shrink-0"
+        className="relative h-9 bg-[#1a1a1a] flex items-center justify-between px-3 select-none shrink-0"
         style={{ WebkitAppRegion: 'drag' } as any}
       >
-        {/* Left Side: App title branding (aligns left with pl-2 when maximized, pl-20 in windowed mode for traffic lights) */}
+        {/* Left Side: Workspace Selector (Bruno style) */}
         <div
-          className={`flex items-center gap-2.5 transition-all duration-150 ${
-            isMaximized ? 'pl-2' : 'pl-20'
-          }`}
+          className={`flex items-center gap-2.5 transition-all duration-150 ${isMaximized ? 'pl-2' : 'pl-20'}`}
           style={{ WebkitAppRegion: 'no-drag' } as any}
         >
-          <div className="flex items-center gap-1.5">
-            <Radio className="w-4 h-4 text-sky-400 animate-pulse" />
-            <span className="font-bold text-xs tracking-wider text-slate-100">INTERCEPTOR</span>
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-400 border border-sky-500/20 font-mono">
-              v1.3
-            </span>
+          <div className="flex items-center gap-1.5 px-2 py-1 text-xs text-[#cccccc] hover:bg-[#26292b] rounded cursor-pointer transition-colors font-medium select-none">
+            <span>My Workspace</span>
+            <ChevronDown className="w-3 h-3 text-[#777777]" />
           </div>
         </div>
 
-        {/* Center: Always in the true horizontal center of the window titlebar */}
-        <div className="absolute left-1/2 -translate-x-1/2 pointer-events-none hidden md:flex items-center gap-2">
-          <span className="text-[11px] font-medium text-slate-400">
-            HTTP & WebSocket Client Workbench
-          </span>
+        {/* Center: Interceptor App Logo Branding */}
+        <div className="absolute left-1/2 -translate-x-1/2 pointer-events-none hidden md:flex items-center gap-1.5">
+          <InterceptorLogo size={16} />
+          <span className="font-semibold text-xs tracking-wide text-[#cccccc] font-sans">Interceptor</span>
         </div>
 
-        {/* Right Side: Environment Selector & Shortcuts */}
+        {/* Right Side: Layout Controls & Panel Toggles */}
         <div
-          className="flex items-center gap-3"
+          className="flex items-center gap-2.5"
           style={{ WebkitAppRegion: 'no-drag' } as any}
         >
-          <EnvironmentSelector
-            environments={environments}
-            activeEnvId={activeEnvId}
-            onSelectEnv={handleSetActiveEnv}
-            onOpenManageModal={() => setIsEnvModalOpen(true)}
-          />
-          <div className="hidden sm:flex items-center gap-2 text-[10px] text-slate-500 font-mono">
-            <span className="bg-[#161b22] px-1.5 py-0.5 rounded border border-[#30363d]">⌘S Save</span>
-            <span className="bg-[#161b22] px-1.5 py-0.5 rounded border border-[#30363d]">⌘↵ Send</span>
+          {/* Layout Customizer Controls */}
+          <div className="flex items-center gap-1 bg-[#222224] p-0.5 rounded border border-[#333333]">
+            <button
+              onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+              className={`p-1 rounded transition-colors cursor-pointer ${!isSidebarCollapsed
+                ? 'bg-[#d99b26]/20 text-[#d99b26]'
+                : 'text-[#888888] hover:text-white hover:bg-[#2e3235]'
+                }`}
+              title={isSidebarCollapsed ? 'Show Sidebar (⌘B)' : 'Hide Sidebar (⌘B)'}
+            >
+              <PanelLeft className="w-3.5 h-3.5" />
+            </button>
+            <div className="w-px h-3.5 bg-[#333333] mx-0.5" />
+            <button
+              onClick={() => setWorkbenchLayout('horizontal')}
+              className={`p-1 rounded transition-colors cursor-pointer ${workbenchLayout === 'horizontal'
+                ? 'bg-[#d99b26] text-white shadow-xs'
+                : 'text-[#888888] hover:text-white hover:bg-[#2e3235]'
+                }`}
+              title="3 Columns Layout (Side-by-side Request & Response)"
+            >
+              <Columns2 className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => setWorkbenchLayout('vertical')}
+              className={`p-1 rounded transition-colors cursor-pointer ${workbenchLayout === 'vertical'
+                ? 'bg-[#d99b26] text-white shadow-xs'
+                : 'text-[#888888] hover:text-white hover:bg-[#2e3235]'
+                }`}
+              title="Stacked Layout (Request Top / Response Bottom)"
+            >
+              <Rows2 className="w-3.5 h-3.5" />
+            </button>
+            <div className="w-px h-3.5 bg-[#333333] mx-0.5" />
+            <button
+              onClick={() => {
+                setSidebarWidth(260);
+                setEditorRatio(0.5);
+              }}
+              className="p-1 rounded text-[#888888] hover:text-white hover:bg-[#2e3235] transition-colors cursor-pointer"
+              title="Reset Layout & Column Widths (50/50)"
+            >
+              <RotateCcw className="w-3 h-3" />
+            </button>
           </div>
         </div>
       </header>
 
       {/* Main Content Area (Sidebar + Workspace side-by-side) */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Sidebar with Collections & History */}
-        <Sidebar
-          history={history}
-          collections={collections}
-          onSelectRequest={handleSelectFromSidebar}
-          onClearHistory={handleClearHistory}
-          onUpdateCollections={updateCollections}
-          onNewRequestInCollection={handleNewRequestInCollection}
-          onRunCollection={(col) => setCollectionToRun(col)}
-          isCollapsed={isSidebarCollapsed}
-          onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-          environments={environments}
-          activeEnvId={activeEnvId}
-          activeItemId={activeTab.protocol === 'http' ? activeTab.request.itemId || activeTab.request.id : undefined}
-        />
+      <div
+        className={`flex-1 flex overflow-hidden ${isDraggingSidebar || isDraggingEditor ? 'select-none pointer-events-auto' : ''
+          }`}
+      >
+        {/* Column 1: Sidebar with Collections & History (Smooth Animated Slide Drawer) */}
+        <div
+          className={`shrink-0 overflow-hidden ${isDraggingSidebar ? '' : 'transition-all duration-300 ease-in-out'
+            }`}
+          style={{
+            width: isSidebarCollapsed ? 0 : `${sidebarWidth}px`,
+            opacity: isSidebarCollapsed ? 0 : 1,
+            pointerEvents: isSidebarCollapsed ? 'none' : 'auto',
+          }}
+        >
+          <div style={{ width: `${sidebarWidth}px` }} className="h-full">
+            <Sidebar
+              history={history}
+              collections={collections}
+              onSelectRequest={handleSelectFromSidebar}
+              onClearHistory={handleClearHistory}
+              onUpdateCollections={updateCollections}
+              onNewRequestInCollection={handleNewRequestInCollection}
+              onRunCollection={(col) => setCollectionToRun(col)}
+              environments={environments}
+              activeEnvId={activeEnvId}
+              activeItemId={activeTab.protocol === 'http' ? activeTab.request.itemId || activeTab.request.id : undefined}
+              width={sidebarWidth}
+            />
+          </div>
+        </div>
+
+        {/* Splitter 1: Sidebar Resizer Handle (Smooth transition with sidebar) */}
+        <div
+          onMouseDown={!isSidebarCollapsed ? handleStartSidebarResize : undefined}
+          className={`z-20 select-none group flex items-center justify-center shrink-0 border-r border-[#333333] ${isDraggingSidebar ? '' : 'transition-all duration-300 ease-in-out'
+            } ${isSidebarCollapsed
+              ? 'w-0 opacity-0 pointer-events-none border-transparent'
+              : 'w-1.5 -ml-1 cursor-col-resize hover:bg-[#d99b26] active:bg-[#d99b26]'
+            } ${isDraggingSidebar ? 'bg-[#d99b26]' : ''}`}
+          title="Drag to resize sidebar (Double click to reset to 260px)"
+          onDoubleClick={() => setSidebarWidth(260)}
+        >
+          {!isSidebarCollapsed && (
+            <div className="w-0.5 h-6 rounded-full bg-[#444444] group-hover:bg-[#d99b26] transition-colors" />
+          )}
+        </div>
 
         {/* Main Workspace */}
-        <div className="flex-1 flex flex-col h-full overflow-hidden">
+        <div className="flex-1 flex flex-col h-full overflow-hidden min-w-0 bg-[#1a1a1a]">
+          {/* Collection Header (Bruno-style directly above tabs, matching Image 4) */}
+          <div className="flex items-center justify-between px-4 h-9 bg-[#1a1a1a] border-b border-[#333333] shrink-0 select-none">
+            {/* Left: Active collection dropdown */}
+            <div className="flex items-center gap-1.5 px-2 py-1 text-xs text-[#cccccc] hover:bg-[#26292b] rounded cursor-pointer transition-colors font-medium">
+              <Box className="w-3.5 h-3.5 text-[#999999]" />
+              <span>{activeCollectionName || 'Test'}</span>
+              <ChevronDown className="w-3 h-3 text-[#777777]" />
+            </div>
+
+            {/* Right: Git, Shield, More, Environment Selector */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => showToast({ type: 'info', title: 'Git Integration', message: 'Git repository tracking active.' })}
+                className="flex items-center gap-1.5 px-2.5 py-1 text-xs text-[#888888] hover:text-[#cccccc] hover:bg-[#26292b] border border-[#333333] rounded transition-colors cursor-pointer"
+                title="Initialize Git repository"
+              >
+                <GitFork className="w-3.5 h-3.5 text-[#d99b26]" />
+                <span>Initialize Git</span>
+              </button>
+
+              <button
+                className="p-1.5 text-[#888888] hover:text-emerald-400 hover:bg-[#26292b] rounded transition-colors cursor-pointer"
+                title="Safe Sandbox Active"
+              >
+                <Shield className="w-3.5 h-3.5 text-emerald-400" />
+              </button>
+
+              <button
+                className="p-1 text-[#888888] hover:text-[#cccccc] hover:bg-[#26292b] border border-[#333333] rounded transition-colors cursor-pointer"
+                title="More options"
+              >
+                <MoreHorizontal className="w-3.5 h-3.5" />
+              </button>
+
+              <EnvironmentSelector
+                environments={environments}
+                activeEnvId={activeEnvId}
+                onSelectEnv={handleSetActiveEnv}
+                onOpenManageModal={() => setIsEnvModalOpen(true)}
+              />
+            </div>
+          </div>
+
           {/* Request Tabs (HTTP & WebSocket) */}
           <RequestTabs
             tabs={tabs}
@@ -1270,207 +1528,324 @@ export const App: React.FC = () => {
             onNewTab={(protocol) => handleNewTab(protocol || 'http')}
           />
 
-        {/* Tab Content: Switch between HTTP Workbench & WebSocket Workbench */}
-        {activeTab.protocol === 'websocket' ? (
-          <WebSocketWorkbench
-            url={activeTab.wsUrl}
-            onUrlChange={(url) => {
-              setTabs((prev) =>
-                prev.map((t) => (t.id === activeTabId ? { ...t, wsUrl: url } : t))
-              );
-            }}
-            status={activeTab.wsStatus || 'disconnected'}
-            messages={activeTab.wsMessages || []}
-            onConnect={handleWsConnect}
-            onDisconnect={handleWsDisconnect}
-            onSendMessage={handleWsSendMessage}
-            onClearMessages={handleWsClearMessages}
-          />
-        ) : (
-          <div className="flex-1 flex flex-col h-full overflow-hidden">
-            {/* Main Request Bar */}
-            <RequestBar
-              method={activeTab.request.method}
-              onMethodChange={handleMethodChange}
-              url={activeTab.request.url}
-              onUrlChange={handleUrlChange}
-              onSend={handleSendRequest}
-              onCancel={handleCancelRequest}
-              onSave={handleSaveActiveRequest}
-              onOpenCodeSnippet={() => setIsCodeModalOpen(true)}
-              onImportCurl={handleImportCurl}
-              activeEnvironment={activeEnvironment}
-              environments={environments}
-              onOpenEnvironmentModal={() => setIsEnvModalOpen(true)}
-              isLoading={activeTab.isLoading}
-              isDirty={activeTab.isDirty}
+          {/* Tab Content: Switch between HTTP Workbench & WebSocket Workbench */}
+          {activeTab.protocol === 'websocket' ? (
+            <WebSocketWorkbench
+              url={activeTab.wsUrl}
+              onUrlChange={(url) => {
+                setTabs((prev) =>
+                  prev.map((t) => (t.id === activeTabId ? { ...t, wsUrl: url } : t))
+                );
+              }}
+              status={activeTab.wsStatus || 'disconnected'}
+              messages={activeTab.wsMessages || []}
+              onConnect={handleWsConnect}
+              onDisconnect={handleWsDisconnect}
+              onSendMessage={handleWsSendMessage}
+              onClearMessages={handleWsClearMessages}
             />
+          ) : (
+            <div className="flex-1 flex flex-col h-full overflow-hidden">
+              {/* Main Request Bar */}
+              <RequestBar
+                method={activeTab.request.method}
+                onMethodChange={handleMethodChange}
+                url={activeTab.request.url}
+                onUrlChange={handleUrlChange}
+                onSend={handleSendRequest}
+                onCancel={handleCancelRequest}
+                onSave={handleSaveActiveRequest}
+                onOpenCodeSnippet={() => setIsCodeModalOpen(true)}
+                onImportCurl={handleImportCurl}
+                activeEnvironment={activeEnvironment}
+                environments={environments}
+                onOpenEnvironmentModal={() => setIsEnvModalOpen(true)}
+                isLoading={activeTab.isLoading}
+                isDirty={activeTab.isDirty}
+              />
 
-            {/* Workbench Body: Split View (Editor on Top/Left, Response on Bottom/Right) */}
-            <div className="flex-1 flex flex-col md:flex-row overflow-hidden divide-y md:divide-y-0 md:divide-x divide-[#30363d]">
-              {/* Request Configuration Panel (Left / Top) */}
-              <div className="flex-1 flex flex-col h-1/2 md:h-full overflow-hidden bg-[#161b22]">
-                {/* Sub-tab navigation */}
-                <div className="flex items-center px-3 border-b border-[#30363d] bg-[#0d1117] overflow-x-auto no-scrollbar">
-                  <button
-                    onClick={() => setConfigSubTab('params')}
-                    className={`px-3 py-2 text-xs font-medium border-b-2 transition-colors flex items-center gap-1.5 whitespace-nowrap ${
-                      configSubTab === 'params'
-                        ? 'border-sky-500 text-sky-400'
-                        : 'border-transparent text-slate-400 hover:text-slate-200'
-                    }`}
-                  >
-                    <span>Params</span>
-                    {activeParamsCount > 0 && (
-                      <span className="w-4 h-4 rounded-full bg-sky-500/20 text-sky-400 text-[10px] flex items-center justify-center font-mono">
-                        {activeParamsCount}
-                      </span>
-                    )}
-                  </button>
+              {/* Workbench Body: Flexible Split View (Horizontal 3-column or Vertical Stacked) */}
+              <div
+                ref={workbenchContainerRef}
+                className={`flex-1 flex overflow-hidden ${workbenchLayout === 'horizontal' ? 'flex-row' : 'flex-col'
+                  }`}
+              >
+                {/* Column 2: Request Configuration Panel */}
+                <div
+                  style={
+                    workbenchLayout === 'horizontal'
+                      ? { width: `${editorRatio * 100}%` }
+                      : { height: `${editorRatio * 100}%` }
+                  }
+                  className="flex flex-col overflow-hidden bg-[#1a1a1a] shrink-0 min-w-[200px] min-h-[100px]"
+                >
+                  {/* Sub-tab navigation (Bruno-style ResponsiveTabs, matching Image 2) */}
+                  <div className="flex items-center justify-between px-4 bg-[#1a1a1a] select-none h-9 shrink-0">
+                    <div className="flex items-center h-full gap-5">
+                      <button
+                        onClick={() => setConfigSubTab('params')}
+                        className={`h-full text-xs transition-colors flex items-center gap-1 cursor-pointer border-b-2 ${configSubTab === 'params'
+                          ? 'border-[#d99b26] text-white font-medium'
+                          : 'border-transparent text-[#888888] hover:text-[#cccccc]'
+                          }`}
+                      >
+                        <span>Params</span>
+                        {activeParamsCount > 0 && (
+                          <sup className="font-medium text-[10px] ml-0.5">{activeParamsCount}</sup>
+                        )}
+                      </button>
 
-                  <button
-                    onClick={() => setConfigSubTab('auth')}
-                    className={`px-3 py-2 text-xs font-medium border-b-2 transition-colors flex items-center gap-1.5 whitespace-nowrap ${
-                      configSubTab === 'auth'
-                        ? 'border-sky-500 text-sky-400'
-                        : 'border-transparent text-slate-400 hover:text-slate-200'
-                    }`}
-                  >
-                    <Shield className="w-3 h-3" />
-                    <span>Auth</span>
-                    {authSummary !== 'None' && (
-                      <span className="px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-emerald-400 text-[9px] font-mono border border-emerald-500/30">
-                        {authSummary}
-                      </span>
-                    )}
-                  </button>
+                      <button
+                        onClick={() => setConfigSubTab('body')}
+                        className={`h-full text-xs transition-colors flex items-center gap-1 cursor-pointer border-b-2 ${configSubTab === 'body'
+                          ? 'border-[#d99b26] text-white font-medium'
+                          : 'border-transparent text-[#888888] hover:text-[#cccccc]'
+                          }`}
+                      >
+                        <span>Body</span>
+                        {activeTab.request.bodyType !== 'none' && (
+                          <span className="text-[#888888] font-bold text-[10px] ml-0.5 leading-none">°</span>
+                        )}
+                      </button>
 
-                  <button
-                    onClick={() => setConfigSubTab('headers')}
-                    className={`px-3 py-2 text-xs font-medium border-b-2 transition-colors flex items-center gap-1.5 whitespace-nowrap ${
-                      configSubTab === 'headers'
-                        ? 'border-sky-500 text-sky-400'
-                        : 'border-transparent text-slate-400 hover:text-slate-200'
-                    }`}
-                  >
-                    <span>Headers</span>
-                    {activeHeadersCount > 0 && (
-                      <span className="w-4 h-4 rounded-full bg-sky-500/20 text-sky-400 text-[10px] flex items-center justify-center font-mono">
-                        {activeHeadersCount}
-                      </span>
-                    )}
-                  </button>
+                      <button
+                        onClick={() => setConfigSubTab('headers')}
+                        className={`h-full text-xs transition-colors flex items-center gap-1 cursor-pointer border-b-2 ${configSubTab === 'headers'
+                          ? 'border-[#d99b26] text-white font-medium'
+                          : 'border-transparent text-[#888888] hover:text-[#cccccc]'
+                          }`}
+                      >
+                        <span>Headers</span>
+                        {activeHeadersCount > 0 && (
+                          <sup className="font-medium text-[10px] ml-0.5">{activeHeadersCount}</sup>
+                        )}
+                      </button>
 
-                  <button
-                    onClick={() => setConfigSubTab('body')}
-                    className={`px-3 py-2 text-xs font-medium border-b-2 transition-colors flex items-center gap-1.5 whitespace-nowrap ${
-                      configSubTab === 'body'
-                        ? 'border-sky-500 text-sky-400'
-                        : 'border-transparent text-slate-400 hover:text-slate-200'
-                    }`}
-                  >
-                    <span>Body</span>
-                    {activeTab.request.bodyType !== 'none' && (
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                    )}
-                  </button>
+                      <button
+                        onClick={() => setConfigSubTab('auth')}
+                        className={`h-full text-xs transition-colors flex items-center gap-1 cursor-pointer border-b-2 ${configSubTab === 'auth'
+                          ? 'border-[#d99b26] text-white font-medium'
+                          : 'border-transparent text-[#888888] hover:text-[#cccccc]'
+                          }`}
+                      >
+                        <span>Auth</span>
+                        {activeTab.request.auth?.type && activeTab.request.auth.type !== 'none' && (
+                          <span className="text-[#888888] font-bold text-[10px] ml-0.5 leading-none">°</span>
+                        )}
+                      </button>
 
-                  <button
-                    onClick={() => setConfigSubTab('tests')}
-                    className={`px-3 py-2 text-xs font-medium border-b-2 transition-colors flex items-center gap-1.5 whitespace-nowrap ${
-                      configSubTab === 'tests'
-                        ? 'border-sky-500 text-sky-400'
-                        : 'border-transparent text-slate-400 hover:text-slate-200'
-                    }`}
-                  >
-                    <CheckSquare className="w-3 h-3" />
-                    <span>Tests</span>
-                    {activeTab.request.testScript && activeTab.request.testScript.trim() && (
-                      <span className="w-1.5 h-1.5 rounded-full bg-sky-400" />
+                      <button
+                        onClick={() => setConfigSubTab('vars')}
+                        className={`h-full text-xs transition-colors flex items-center gap-1 cursor-pointer border-b-2 ${configSubTab === 'vars'
+                          ? 'border-[#d99b26] text-white font-medium'
+                          : 'border-transparent text-[#888888] hover:text-[#cccccc]'
+                          }`}
+                      >
+                        <span>Vars</span>
+                      </button>
+
+                      <button
+                        onClick={() => setConfigSubTab('script')}
+                        className={`h-full text-xs transition-colors flex items-center gap-1 cursor-pointer border-b-2 ${configSubTab === 'script'
+                          ? 'border-[#d99b26] text-white font-medium'
+                          : 'border-transparent text-[#888888] hover:text-[#cccccc]'
+                          }`}
+                      >
+                        <span>Script</span>
+                        {activeTab.request.testScript && activeTab.request.testScript.trim() !== '' && (
+                          <span className="text-[#888888] font-bold text-[10px] ml-0.5 leading-none">°</span>
+                        )}
+                      </button>
+
+                      <button
+                        onClick={() => setConfigSubTab('assert')}
+                        className={`h-full text-xs transition-colors flex items-center gap-1 cursor-pointer border-b-2 ${configSubTab === 'assert'
+                          ? 'border-[#d99b26] text-white font-medium'
+                          : 'border-transparent text-[#888888] hover:text-[#cccccc]'
+                          }`}
+                      >
+                        <span>Assert</span>
+                      </button>
+
+                      <button
+                        onClick={() => setConfigSubTab('tests')}
+                        className={`h-full text-xs transition-colors flex items-center gap-1 cursor-pointer border-b-2 ${configSubTab === 'tests'
+                          ? 'border-[#d99b26] text-white font-medium'
+                          : 'border-transparent text-[#888888] hover:text-[#cccccc]'
+                          }`}
+                      >
+                        <span>Tests</span>
+                        {activeTab.request.testScript && activeTab.request.testScript.trim() !== '' && (
+                          <span className="text-[#888888] font-bold text-[10px] ml-0.5 leading-none">°</span>
+                        )}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => showToast({ type: 'info', title: 'More Options', message: 'Docs and settings available' })}
+                        className="text-xs text-[#888888] hover:text-white transition-colors cursor-pointer"
+                        title="More tabs"
+                      >
+                        »
+                      </button>
+                    </div>
+
+                    {/* Right side helper when Body is selected (matches Image 5 & 6) */}
+                    {configSubTab === 'body' && (
+                      <RequestBodyModeDropdown
+                        bodyMode={activeTab.request.bodyType}
+                        onModeChange={handleBodyTypeChange}
+                        onPrettify={handlePrettifyBody}
+                      />
                     )}
-                  </button>
+                  </div>
+
+                  {/* Sub-tab view body */}
+                  <div className="flex-1 overflow-auto bg-[#1a1a1a]">
+                    {configSubTab === 'params' && (
+                      <KeyValueEditor
+                        items={activeTab.request.params}
+                        onChange={handleParamsChange}
+                        title="Query"
+                        keyPlaceholder="Name"
+                        valuePlaceholder="Value"
+                        descriptionPlaceholder="Description"
+                        activeEnvironment={activeEnvironment}
+                        environments={environments}
+                        onOpenEnvironmentModal={() => setIsEnvModalOpen(true)}
+                      />
+                    )}
+
+                    {configSubTab === 'auth' && (
+                      <AuthEditor
+                        auth={activeTab.request.auth}
+                        onChange={handleAuthChange}
+                        activeEnvironment={activeEnvironment}
+                        environments={environments}
+                        onOpenEnvironmentModal={() => setIsEnvModalOpen(true)}
+                      />
+                    )}
+
+                    {configSubTab === 'headers' && (
+                      <KeyValueEditor
+                        items={activeTab.request.headers}
+                        onChange={handleHeadersChange}
+                        title="Headers"
+                        keyPlaceholder="Name"
+                        valuePlaceholder="Value"
+                        descriptionPlaceholder="Description"
+                        activeEnvironment={activeEnvironment}
+                        environments={environments}
+                        onOpenEnvironmentModal={() => setIsEnvModalOpen(true)}
+                      />
+                    )}
+
+                    {configSubTab === 'body' && (
+                      <BodyEditor
+                        bodyType={activeTab.request.bodyType}
+                        onBodyTypeChange={handleBodyTypeChange}
+                        bodyContent={activeTab.request.bodyContent}
+                        onBodyContentChange={handleBodyContentChange}
+                        formData={activeTab.request.formData}
+                        onFormDataChange={handleFormDataChange}
+                        urlEncoded={activeTab.request.urlEncoded}
+                        onUrlEncodedChange={handleUrlEncodedChange}
+                        binaryFilePath={activeTab.request.binaryFilePath}
+                        binaryFileName={activeTab.request.binaryFileName}
+                        onBinaryFileChange={handleBinaryFileChange}
+                        activeEnvironment={activeEnvironment}
+                        environments={environments}
+                        onOpenEnvironmentModal={() => setIsEnvModalOpen(true)}
+                      />
+                    )}
+
+                    {configSubTab === 'vars' && (
+                      <div className="p-4 space-y-4">
+                        <div className="flex items-center justify-between pb-2 border-b border-[#333333]">
+                          <span className="font-semibold text-xs text-[#888888]">Request Variables</span>
+                          <button
+                            onClick={() => setIsEnvModalOpen(true)}
+                            className="text-xs text-[#3b82f6] hover:underline cursor-pointer"
+                          >
+                            Manage Environments
+                          </button>
+                        </div>
+                        <p className="text-xs text-[#888888]">
+                          Active Environment: <strong className="text-white">{activeEnvironment?.name || 'No Environment'}</strong>
+                        </p>
+                        {activeEnvironment?.variables && activeEnvironment.variables.length > 0 ? (
+                          <div className="border border-[#333333] rounded overflow-hidden">
+                            <table className="w-full text-xs">
+                              <thead>
+                                <tr className="bg-[#222224] text-[#888888] h-7 border-b border-[#333333]">
+                                  <th className="px-3 text-left font-normal">Name</th>
+                                  <th className="px-3 text-left font-normal">Value</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {activeEnvironment.variables.map((v) => (
+                                  <tr key={v.id} className="h-7 border-b border-[#333333]/50 hover:bg-[#222224]">
+                                    <td className="px-3 font-mono text-[#d99b26]">{v.key}</td>
+                                    <td className="px-3 font-mono text-[#cccccc]">{v.value}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        ) : (
+                          <p className="text-xs text-[#666666] italic">No environment variables defined.</p>
+                        )}
+                      </div>
+                    )}
+
+                    {(configSubTab === 'script' || configSubTab === 'assert' || configSubTab === 'tests') && (
+                      <TestScriptEditor
+                        script={activeTab.request.testScript || ''}
+                        onChange={handleTestScriptChange}
+                        activeEnvironment={activeEnvironment}
+                        environments={environments}
+                        onOpenEnvironmentModal={() => setIsEnvModalOpen(true)}
+                      />
+                    )}
+                  </div>
                 </div>
 
-                {/* Sub-tab Content Area */}
-                <div className="flex-1 p-3 overflow-hidden bg-[#161b22]">
-                  {configSubTab === 'params' && (
-                    <KeyValueEditor
-                      items={activeTab.request.params}
-                      onChange={handleParamsChange}
-                      keyPlaceholder="Parameter Name"
-                      valuePlaceholder="Value (e.g. {{limit}})"
-                      activeEnvironment={activeEnvironment}
-                      environments={environments}
-                      onOpenEnvironmentModal={() => setIsEnvModalOpen(true)}
-                    />
-                  )}
-
-                  {configSubTab === 'auth' && (
-                    <AuthEditor
-                      auth={activeTab.request.auth}
-                      onChange={handleAuthChange}
-                      activeEnvironment={activeEnvironment}
-                      environments={environments}
-                      onOpenEnvironmentModal={() => setIsEnvModalOpen(true)}
-                    />
-                  )}
-
-                  {configSubTab === 'headers' && (
-                    <KeyValueEditor
-                      items={activeTab.request.headers}
-                      onChange={handleHeadersChange}
-                      keyPlaceholder="Header Name (e.g. Authorization)"
-                      valuePlaceholder="Header Value (e.g. Bearer {{apiKey}})"
-                      activeEnvironment={activeEnvironment}
-                      environments={environments}
-                      onOpenEnvironmentModal={() => setIsEnvModalOpen(true)}
-                    />
-                  )}
-
-                  {configSubTab === 'body' && (
-                    <BodyEditor
-                      bodyType={activeTab.request.bodyType}
-                      onBodyTypeChange={handleBodyTypeChange}
-                      bodyContent={activeTab.request.bodyContent}
-                      onBodyContentChange={handleBodyContentChange}
-                      formData={activeTab.request.formData}
-                      onFormDataChange={handleFormDataChange}
-                      urlEncoded={activeTab.request.urlEncoded}
-                      onUrlEncodedChange={handleUrlEncodedChange}
-                      binaryFilePath={activeTab.request.binaryFilePath}
-                      binaryFileName={activeTab.request.binaryFileName}
-                      onBinaryFileChange={handleBinaryFileChange}
-                      activeEnvironment={activeEnvironment}
-                      environments={environments}
-                      onOpenEnvironmentModal={() => setIsEnvModalOpen(true)}
-                    />
-                  )}
-
-                  {configSubTab === 'tests' && (
-                    <TestScriptEditor
-                      script={activeTab.request.testScript || ''}
-                      onChange={handleTestScriptChange}
-                      activeEnvironment={activeEnvironment}
-                      environments={environments}
-                      onOpenEnvironmentModal={() => setIsEnvModalOpen(true)}
-                    />
-                  )}
+                {/* Splitter 2: Editor vs Response Resizer Handle */}
+                <div
+                  onMouseDown={handleStartEditorResize}
+                  className={`z-20 select-none group flex items-center justify-center shrink-0 ${workbenchLayout === 'horizontal'
+                    ? 'w-1.5 -ml-1 cursor-col-resize hover:bg-[#d99b26] active:bg-[#d99b26] border-r border-[#333333]'
+                    : 'h-1.5 -mt-1 cursor-row-resize hover:bg-[#d99b26] active:bg-[#d99b26] border-b border-[#333333]'
+                    } ${isDraggingEditor ? 'bg-[#d99b26]' : ''}`}
+                  title={`Drag to resize ${workbenchLayout === 'horizontal' ? 'columns' : 'rows'}`}
+                  onDoubleClick={() => setEditorRatio(0.5)}
+                >
+                  <div
+                    className={`rounded-full bg-[#444444] group-hover:bg-[#d99b26] transition-colors ${workbenchLayout === 'horizontal' ? 'w-0.5 h-6' : 'h-0.5 w-6'
+                      }`}
+                  />
                 </div>
-              </div>
 
-              {/* Response Inspector Panel (Right / Bottom) */}
-              <div className="flex-1 flex flex-col h-1/2 md:h-full overflow-hidden bg-[#0d1117]">
-                <ResponseViewer
-                  response={activeTab.response}
-                  isLoading={activeTab.isLoading}
-                  activeUrl={activeTab.request.url}
-                />
+                {/* Column 3: Response Viewer Panel */}
+                <div
+                  style={
+                    workbenchLayout === 'horizontal'
+                      ? { width: `${(1 - editorRatio) * 100}%` }
+                      : { height: `${(1 - editorRatio) * 100}%` }
+                  }
+                  className="flex flex-col overflow-hidden bg-[#1a1a1a] shrink-0 min-w-[250px] min-h-[100px]"
+                >
+                  <ResponseViewer
+                    response={activeTab.response}
+                    isLoading={activeTab.isLoading}
+                    activeUrl={activeTab.request.url}
+                  />
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
-    </div>
 
       {/* Save Request Modal */}
       <SaveRequestModal
@@ -1506,6 +1881,75 @@ export const App: React.FC = () => {
         environments={environments}
         activeEnvId={activeEnvId}
       />
+
+      {/* Bottom Status Bar (Bruno-style full width status bar, matching Image 4) */}
+      <footer className="h-6 bg-[#1a1a1a] border-t border-[#333333] text-[11px] text-[#888888] flex items-center justify-between px-3 select-none shrink-0 z-30">
+        {/* Left: Preferences, Shortcuts, Git, Brand */}
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setIsEnvModalOpen(true)}
+            className="flex items-center text-[#888888] hover:text-white transition-colors cursor-pointer"
+            title="Preferences & Settings"
+          >
+            <Settings className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={() => setIsEnvModalOpen(true)}
+            className="flex items-center text-[#888888] hover:text-white transition-colors cursor-pointer"
+            title="Environment Variables (⌘E)"
+          >
+            <Key className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={() => window.open?.('https://github.com/usebruno/bruno', '_blank')}
+            className="flex items-center text-[#888888] hover:text-white transition-colors cursor-pointer"
+            title="GitHub Repository"
+          >
+            <GitFork className="w-3.5 h-3.5" />
+          </button>
+          <div className="w-px h-3 bg-[#333333]" />
+          <div className="flex items-center gap-1 text-[#d99b26] font-medium cursor-pointer hover:underline text-[11px]">
+            <Sparkles className="w-3 h-3" />
+            <span>Try Interceptor Pro</span>
+          </div>
+        </div>
+
+        {/* Right: Search, Cookies, Dev Tools, Version */}
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => showToast({ type: 'info', title: 'Global Search', message: 'Press ⌘F to search across requests' })}
+            className="flex items-center gap-1 text-[#888888] hover:text-[#cccccc] transition-colors cursor-pointer"
+          >
+            <Search className="w-3 h-3" />
+            <span>Search</span>
+          </button>
+
+          <button
+            onClick={() => showToast({ type: 'info', title: 'Cookie Manager', message: 'Cookie store synchronized.' })}
+            className="flex items-center gap-1 text-[#888888] hover:text-[#cccccc] transition-colors cursor-pointer"
+          >
+            <Cookie className="w-3 h-3" />
+            <span>Cookies</span>
+          </button>
+
+          <button
+            onClick={() => {
+              if ((window as any).interceptor?.openDevTools) {
+                (window as any).interceptor.openDevTools();
+              } else {
+                showToast({ type: 'info', title: 'Dev Tools', message: 'Developer tools available in Electron.' });
+              }
+            }}
+            className="flex items-center gap-1 text-[#888888] hover:text-[#cccccc] transition-colors cursor-pointer"
+          >
+            <Terminal className="w-3 h-3" />
+            <span>Dev Tools</span>
+          </button>
+
+          <div className="w-px h-3 bg-[#333333]" />
+          <span className="font-mono text-[#666666] text-[10px]">v1.2.0</span>
+        </div>
+      </footer>
 
       {/* Toast Notification Container */}
       <Toast toast={toast} onDismiss={() => setToast(null)} />
