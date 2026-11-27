@@ -1954,7 +1954,7 @@ export const App: React.FC = () => {
           </button>
 
           <div className="w-px h-3 bg-[#333333]" />
-          <span className="font-mono text-[#666666] text-[10px]">v1.2.0</span>
+          <span className="font-mono text-[#666666] text-[10px]">v{__APP_VERSION__}</span>
         </div>
       </footer>
 

@@ -17,7 +17,11 @@
     "dist:mac": "npm run build && electron-builder --mac -p never",
     "dist:win": "npm run build && electron-builder --win -p never",
     "dist:linux": "npm run build && electron-builder --linux -p never",
-    "dist:all": "npm run build && electron-builder -mwl -p never"
+    "dist:all": "npm run build && electron-builder -mwl -p never",
+    "release": "node scripts/release.js",
+    "release:patch": "node scripts/release.js patch",
+    "release:minor": "node scripts/release.js minor",
+    "release:major": "node scripts/release.js major"
   },
   "keywords": [
     "api-client",

@@ -6,6 +6,16 @@ on:
       - 'v*'
       - '[0-9]*'
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g. 1.0.1; leave empty to use package.json)'
+        required: false
+        default: ''
+      create_release:
+        description: 'Publish GitHub Release with distributables'
+        type: boolean
+        required: false
+        default: true
 
 permissions:
   contents: write
@@ -28,6 +38,21 @@ jobs:
         with:
           node-version: 24
           cache: 'npm'
+
+      - name: Sync Version from Git Tag or Input
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ inputs.version }}" ]; then
+            TARGET_VERSION="${{ inputs.version }}"
+            TARGET_VERSION="${TARGET_VERSION#v}"
+            echo "Setting package version to $TARGET_VERSION from workflow_dispatch input"
+            npm version "$TARGET_VERSION" --no-git-tag-version --allow-same-version
+          elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            TAG_NAME="${{ github.ref_name }}"
+            TARGET_VERSION="${TAG_NAME#v}"
+            echo "Setting package version to $TARGET_VERSION from git tag $TAG_NAME"
+            npm version "$TARGET_VERSION" --no-git-tag-version --allow-same-version
+          fi
+          echo "Current package.json version: $(node -p "require('./package.json').version")"
 
       - name: Install Dependencies
         run: npm install
@@ -53,10 +78,33 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Determine Release Tag and Title
+        id: release_meta
+        if: startsWith(github.ref, 'refs/tags/') || (github.event_name == 'workflow_dispatch' && inputs.create_release)
+        run: |
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            echo "tag=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+            echo "title=Release ${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          elif [ -n "${{ inputs.version }}" ]; then
+            INPUT_VER="${{ inputs.version }}"
+            INPUT_VER="${INPUT_VER#v}"
+            echo "tag=v${INPUT_VER}" >> $GITHUB_OUTPUT
+            echo "title=Release v${INPUT_VER}" >> $GITHUB_OUTPUT
+          else
+            echo "tag=v${PKG_VERSION}" >> $GITHUB_OUTPUT
+            echo "title=Release v${PKG_VERSION}" >> $GITHUB_OUTPUT
+          fi
+
       - name: Upload Release Artifacts
         uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/tags/')
+        if: startsWith(github.ref, 'refs/tags/') || (github.event_name == 'workflow_dispatch' && inputs.create_release)
         with:
+          tag_name: ${{ steps.release_meta.outputs.tag }}
+          name: ${{ steps.release_meta.outputs.title }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
           files: |
             release/*.dmg
             release/*.zip
