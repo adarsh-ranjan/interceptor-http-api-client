@@ -24,6 +24,9 @@ jobs:
   release:
     name: Build (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
     strategy:
       fail-fast: false
       matrix:
@@ -39,20 +42,14 @@ jobs:
           node-version: 24
           cache: 'npm'
 
-      - name: Sync Version from Git Tag or Input
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ inputs.version }}" ]; then
-            TARGET_VERSION="${{ inputs.version }}"
-            TARGET_VERSION="${TARGET_VERSION#v}"
-            echo "Setting package version to $TARGET_VERSION from workflow_dispatch input"
-            npm version "$TARGET_VERSION" --no-git-tag-version --allow-same-version
-          elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
-            TAG_NAME="${{ github.ref_name }}"
-            TARGET_VERSION="${TAG_NAME#v}"
-            echo "Setting package version to $TARGET_VERSION from git tag $TAG_NAME"
-            npm version "$TARGET_VERSION" --no-git-tag-version --allow-same-version
-          fi
-          echo "Current package.json version: $(node -p "require('./package.json').version")"
+      - name: Sync Version and Prepare Release Metadata
+        id: release_meta
+        run: node scripts/sync-version.js
+        env:
+          GITHUB_REF: ${{ github.ref }}
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          INPUT_VERSION: ${{ inputs.version }}
 
       - name: Install Dependencies
         run: npm install
@@ -77,24 +74,6 @@ jobs:
         run: npm run dist:linux
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Determine Release Tag and Title
-        id: release_meta
-        if: startsWith(github.ref, 'refs/tags/') || (github.event_name == 'workflow_dispatch' && inputs.create_release)
-        run: |
-          PKG_VERSION=$(node -p "require('./package.json').version")
-          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
-            echo "tag=${{ github.ref_name }}" >> $GITHUB_OUTPUT
-            echo "title=Release ${{ github.ref_name }}" >> $GITHUB_OUTPUT
-          elif [ -n "${{ inputs.version }}" ]; then
-            INPUT_VER="${{ inputs.version }}"
-            INPUT_VER="${INPUT_VER#v}"
-            echo "tag=v${INPUT_VER}" >> $GITHUB_OUTPUT
-            echo "title=Release v${INPUT_VER}" >> $GITHUB_OUTPUT
-          else
-            echo "tag=v${PKG_VERSION}" >> $GITHUB_OUTPUT
-            echo "title=Release v${PKG_VERSION}" >> $GITHUB_OUTPUT
-          fi
 
       - name: Upload Release Artifacts
         uses: softprops/action-gh-release@v2
