@@ -781,17 +781,24 @@ export const App: React.FC = () => {
         };
       }
     } catch (err: any) {
+      const causeText = err.cause
+        ? (typeof err.cause === 'object' ? (err.cause.code || err.cause.message || JSON.stringify(err.cause)) : String(err.cause))
+        : '';
+      const detailedError = causeText
+        ? `${err.message || 'Request failed'}: ${causeText}`
+        : (err.message || 'Unknown network error');
+
       responseData = {
         status: 0,
         statusText: 'Error',
         headers: {},
         data: null,
-        rawBody: err.message,
+        rawBody: detailedError,
         contentType: 'text/plain',
         isJson: false,
         timeMs: 0,
         sizeBytes: 0,
-        error: err.message,
+        error: detailedError,
       };
     }
 

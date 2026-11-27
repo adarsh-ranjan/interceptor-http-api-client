@@ -1,6 +1,25 @@
 import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import path from 'path';
 import fs from 'fs';
+import tls from 'tls';
+
+// Trust the OS certificate store (where corporate/proxy root CAs live) in addition to
+// Node's bundled Mozilla roots, plus any PEM bundle in NODE_EXTRA_CA_CERTS.
+// Certificate validation stays ON - we only extend the trusted CA list.
+// Packaged apps launched from Finder/Explorer don't inherit shell env vars, so relying on
+// NODE_EXTRA_CA_CERTS alone is not enough.
+function configureTrustedCAs() {
+  try {
+    const cas = new Set<string>(tls.getCACertificates('default'));
+    for (const cert of tls.getCACertificates('system')) cas.add(cert);
+    for (const cert of tls.getCACertificates('extra')) cas.add(cert);
+    tls.setDefaultCACertificates([...cas]);
+  } catch (err) {
+    console.warn('[Interceptor] Could not load system CA certificates:', err);
+  }
+}
+
+configureTrustedCAs();
 
 let mainWindow: BrowserWindow | null = null;
 const activeRequests = new Map<string, AbortController>();
@@ -113,17 +132,23 @@ ipcMain.handle('http:execute', async (_event, options) => {
 
   try {
     // Validate and parse URL
+    const cleanUrl = (url || '').trim();
     let parsedUrl: URL;
     try {
-      parsedUrl = new URL(url.startsWith('http://') || url.startsWith('https://') ? url : `http://${url}`);
+      parsedUrl = new URL(cleanUrl.startsWith('http://') || cleanUrl.startsWith('https://') ? cleanUrl : `http://${cleanUrl}`);
     } catch {
       throw new Error(`Invalid URL: ${url}`);
     }
 
     const fetchHeaders = new Headers();
     for (const [key, value] of Object.entries(headers)) {
-      if (key && value !== undefined && value !== null) {
-        fetchHeaders.append(key, String(value));
+      const trimmedKey = key?.trim();
+      if (trimmedKey && value !== undefined && value !== null) {
+        try {
+          fetchHeaders.append(trimmedKey, String(value));
+        } catch {
+          // ignore headers with unsupported characters
+        }
       }
     }
 
@@ -183,7 +208,26 @@ ipcMain.handle('http:execute', async (_event, options) => {
       }
     }
 
-    const response = await fetch(parsedUrl.toString(), requestInit);
+    let response: Response;
+    try {
+      response = await fetch(parsedUrl.toString(), requestInit);
+    } catch (fetchErr: any) {
+      // In Node.js, localhost resolves to ::1 (IPv6) by default.
+      // If the target server is only listening on 127.0.0.1 (IPv4), undici throws "fetch failed (ECONNREFUSED ::1)".
+      // Automatically retry with 127.0.0.1 (IPv4) to avoid false connection failures.
+      if (parsedUrl.hostname === 'localhost') {
+        try {
+          const ipv4Url = new URL(parsedUrl.toString());
+          ipv4Url.hostname = '127.0.0.1';
+          response = await fetch(ipv4Url.toString(), requestInit);
+        } catch {
+          throw fetchErr;
+        }
+      } else {
+        throw fetchErr;
+      }
+    }
+
     clearTimeout(timeoutId);
     activeRequests.delete(id);
 
@@ -232,17 +276,56 @@ ipcMain.handle('http:execute', async (_event, options) => {
     activeRequests.delete(id);
     const endTime = performance.now();
 
+    let causeInfo = '';
+    if (error.cause) {
+      if (typeof error.cause === 'object') {
+        const code = error.cause.code || '';
+        const msg = error.cause.message || '';
+        const address = error.cause.address ? ` at ${error.cause.address}:${error.cause.port}` : '';
+        if (code && msg) {
+          causeInfo = `${code}: ${msg}${address}`;
+        } else if (code) {
+          causeInfo = `${code}${address}`;
+        } else if (msg) {
+          causeInfo = msg;
+        } else {
+          causeInfo = JSON.stringify(error.cause);
+        }
+      } else {
+        causeInfo = String(error.cause);
+      }
+    }
+
+    let detailedMessage = '';
+    if (error.name === 'AbortError') {
+      detailedMessage = `Request timed out or was aborted after ${timeout}ms`;
+    } else if (causeInfo.includes('ECONNREFUSED')) {
+      detailedMessage = `Connection refused (${causeInfo}). Is the target server running on that port?`;
+    } else if (causeInfo.includes('ENOTFOUND')) {
+      detailedMessage = `Host not found (${causeInfo}). DNS resolution failed — verify the hostname or internet connection.`;
+    } else if (causeInfo.includes('ETIMEDOUT') || causeInfo.includes('UND_ERR_CONNECT_TIMEOUT')) {
+      detailedMessage = `Connection timed out (${causeInfo}).`;
+    } else if (causeInfo.includes('CERT') || causeInfo.includes('SELF_SIGNED')) {
+      detailedMessage = `SSL Certificate Error (${causeInfo}).`;
+    } else if (causeInfo) {
+      detailedMessage = `${error.message || 'Request failed'}: ${causeInfo}`;
+    } else {
+      detailedMessage = error.message || 'Request failed';
+    }
+
+    console.error(`[Interceptor HTTP Error] ${method} ${url}:`, detailedMessage, error);
+
     return {
       status: 0,
       statusText: error.name === 'AbortError' ? 'Aborted' : 'Error',
       headers: {},
       data: null,
-      rawBody: error.message || 'Unknown network error',
+      rawBody: detailedMessage,
       contentType: 'text/plain',
       isJson: false,
       timeMs: Math.round(endTime - startTime),
       sizeBytes: 0,
-      error: error.message || 'Request failed',
+      error: detailedMessage,
     };
   }
 });
