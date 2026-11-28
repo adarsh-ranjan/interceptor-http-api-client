@@ -1,4 +1,5 @@
 import { HttpMethod, KeyValuePair } from '../types';
+import { generateId } from './id';
 
 export function formatBytes(bytes: number): string {
   if (bytes === 0) return '0 B';
@@ -120,7 +121,7 @@ export function extractParamsFromUrl(url: string, existingParams: KeyValuePair[]
       // Preserve ID if it already existed in existingParams
       const matched = existingParams.find((p) => p.key === key);
       newParams.push({
-        id: matched ? matched.id : Math.random().toString(36).substring(2, 9),
+        id: matched ? matched.id : generateId(),
         key,
         value: val,
         enabled: true,

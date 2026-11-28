@@ -1,21 +1,23 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { WebSocketMessage, WebSocketStatus } from '../types';
 import { formatBytes } from '../utils/http';
+import { isValidJsonString } from '../utils/jsonTokenizer';
+import { useKeyedClipboard } from '../hooks/useClipboard';
 import {
-  Radio,
-  Send,
   ArrowDownLeft,
   ArrowUpRight,
-  Info,
-  Trash2,
-  Copy,
   Check,
+  Code2,
+  Copy,
+  Info,
+  Radio,
+  RotateCcw,
+  Search,
+  Send,
   Sparkles,
+  Trash2,
   Wifi,
   WifiOff,
-  Search,
-  RotateCcw,
-  Code2,
 } from 'lucide-react';
 
 interface WebSocketWorkbenchProps {
@@ -46,8 +48,8 @@ export const WebSocketWorkbench: React.FC<WebSocketWorkbenchProps> = ({
   const [payloadType, setPayloadType] = useState<'json' | 'text'>('json');
   const [filter, setFilter] = useState<'all' | 'sent' | 'received'>('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [copiedId, setCopiedId] = useState<string | null>(null);
   const [replayedId, setReplayedId] = useState<string | null>(null);
+  const { copiedKey: copiedId, copy: copyMessage } = useKeyedClipboard(2000);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -56,10 +58,8 @@ export const WebSocketWorkbench: React.FC<WebSocketWorkbenchProps> = ({
     e.preventDefault();
     if (status === 'connected' || status === 'connecting') {
       onDisconnect();
-    } else {
-      if (currentUrl.trim()) {
-        onConnect(currentUrl.trim());
-      }
+    } else if (currentUrl.trim()) {
+      onConnect(currentUrl.trim());
     }
   };
 
@@ -74,41 +74,30 @@ export const WebSocketWorkbench: React.FC<WebSocketWorkbenchProps> = ({
       setMessageInput(JSON.stringify(parsed, null, 2));
       setPayloadType('json');
     } catch {
-      // not json, ignore
+      // Not JSON; ignore
     }
-  };
-
-  const handleCopyMessage = (id: string, text: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedId(id);
-    setTimeout(() => setCopiedId(null), 2000);
   };
 
   const handleReplayMessage = (id: string, data: string) => {
     setMessageInput(data);
     setReplayedId(id);
     setTimeout(() => setReplayedId(null), 1500);
-    try {
-      JSON.parse(data);
-      setPayloadType('json');
-    } catch {
-      setPayloadType('text');
-    }
+    setPayloadType(isValidJsonString(data) ? 'json' : 'text');
     textareaRef.current?.focus();
   };
 
   const sentCount = useMemo(() => messages.filter((m) => m.type === 'sent').length, [messages]);
-  const receivedCount = useMemo(() => messages.filter((m) => m.type === 'received').length, [messages]);
+  const receivedCount = useMemo(
+    () => messages.filter((m) => m.type === 'received').length,
+    [messages]
+  );
 
   const filteredMessages = useMemo(() => {
     return messages.filter((m) => {
       if (filter !== 'all' && m.type !== filter) return false;
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
-        return (
-          m.data.toLowerCase().includes(q) ||
-          m.type.toLowerCase().includes(q)
-        );
+        return m.data.toLowerCase().includes(q) || m.type.toLowerCase().includes(q);
       }
       return true;
     });
@@ -151,7 +140,6 @@ export const WebSocketWorkbench: React.FC<WebSocketWorkbenchProps> = ({
 
   return (
     <div className="flex-1 flex flex-col h-full bg-[#1a1a1a] text-xs overflow-hidden select-none">
-      {/* Top Connection Bar (Bruno Style) */}
       <form
         onSubmit={handleUrlSubmit}
         className="flex items-center gap-2 p-2 bg-[#1a1a1a] border-b border-[#333333]"
@@ -197,11 +185,8 @@ export const WebSocketWorkbench: React.FC<WebSocketWorkbenchProps> = ({
         </div>
       </form>
 
-      {/* Main Split Workbench: Composer on Left, Event Stream on Right */}
       <div className="flex-1 flex flex-col md:flex-row overflow-hidden divide-y md:divide-y-0 md:divide-x divide-[#333333]">
-        {/* Message Composer (Left) */}
         <div className="w-full md:w-1/2 flex flex-col h-1/2 md:h-full bg-[#1a1a1a] overflow-hidden">
-          {/* Composer Sub-Tabs Header */}
           <div className="flex items-center justify-between px-3 border-b border-[#333333] bg-[#1a1a1a]">
             <div className="flex items-center gap-1">
               <div className="px-3 py-2 text-xs font-semibold border-b-2 border-[#d99b26] text-white -mb-px flex items-center gap-1.5">
@@ -209,7 +194,6 @@ export const WebSocketWorkbench: React.FC<WebSocketWorkbenchProps> = ({
                 <span>Message Payload</span>
               </div>
 
-              {/* Format pills */}
               <div className="flex items-center ml-2 bg-[#222224] border border-[#333333] rounded p-0.5">
                 <button
                   type="button"
@@ -267,9 +251,7 @@ export const WebSocketWorkbench: React.FC<WebSocketWorkbenchProps> = ({
             </div>
           </div>
 
-          {/* Code Input Area with Line Gutter */}
           <div className="flex-1 flex overflow-hidden bg-[#1a1a1a]">
-            {/* Line gutter */}
             <div className="w-10 shrink-0 py-2.5 pr-2 select-none text-right font-mono text-xs leading-5 text-[#666666] border-r border-[#333333] bg-[#222224]/50 overflow-hidden">
               {inputLines.map((_, i) => (
                 <div key={i} className="h-5">
@@ -288,7 +270,6 @@ export const WebSocketWorkbench: React.FC<WebSocketWorkbenchProps> = ({
             />
           </div>
 
-          {/* Quick Preset Samples Bar */}
           <div className="p-2 border-t border-[#333333] bg-[#1a1a1a] flex items-center gap-2 overflow-x-auto select-none no-scrollbar">
             <span className="text-[#888888] text-[10px] uppercase font-bold shrink-0">
               Samples:
@@ -296,9 +277,7 @@ export const WebSocketWorkbench: React.FC<WebSocketWorkbenchProps> = ({
             <button
               type="button"
               onClick={() =>
-                setMessageInput(
-                  JSON.stringify({ type: 'ping', timestamp: Date.now() }, null, 2)
-                )
+                setMessageInput(JSON.stringify({ type: 'ping', timestamp: Date.now() }, null, 2))
               }
               className="px-2 py-0.5 rounded bg-[#222224] hover:bg-[#2e3235] text-[#cccccc] hover:text-white border border-[#333333] shrink-0 font-mono text-[10px] transition-colors cursor-pointer"
             >
@@ -308,11 +287,7 @@ export const WebSocketWorkbench: React.FC<WebSocketWorkbenchProps> = ({
               type="button"
               onClick={() =>
                 setMessageInput(
-                  JSON.stringify(
-                    { action: 'subscribe', channel: 'live_stream', id: 1 },
-                    null,
-                    2
-                  )
+                  JSON.stringify({ action: 'subscribe', channel: 'live_stream', id: 1 }, null, 2)
                 )
               }
               className="px-2 py-0.5 rounded bg-[#222224] hover:bg-[#2e3235] text-[#cccccc] hover:text-white border border-[#333333] shrink-0 font-mono text-[10px] transition-colors cursor-pointer"
@@ -323,11 +298,7 @@ export const WebSocketWorkbench: React.FC<WebSocketWorkbenchProps> = ({
               type="button"
               onClick={() =>
                 setMessageInput(
-                  JSON.stringify(
-                    { event: 'echo', data: 'Hello from Interceptor!' },
-                    null,
-                    2
-                  )
+                  JSON.stringify({ event: 'echo', data: 'Hello from Interceptor!' }, null, 2)
                 )
               }
               className="px-2 py-0.5 rounded bg-[#222224] hover:bg-[#2e3235] text-[#cccccc] hover:text-white border border-[#333333] shrink-0 font-mono text-[10px] transition-colors cursor-pointer"
@@ -337,9 +308,7 @@ export const WebSocketWorkbench: React.FC<WebSocketWorkbenchProps> = ({
           </div>
         </div>
 
-        {/* Live Event Stream / Messages Log (Right) */}
         <div className="w-full md:w-1/2 flex flex-col h-1/2 md:h-full bg-[#1a1a1a] overflow-hidden">
-          {/* Stream Header with Bruno-style Filter Tabs */}
           <div className="flex items-center justify-between px-3 border-b border-[#333333] bg-[#1a1a1a] select-none flex-wrap gap-2">
             <div className="flex items-center gap-1">
               <button
@@ -389,7 +358,6 @@ export const WebSocketWorkbench: React.FC<WebSocketWorkbenchProps> = ({
             </div>
 
             <div className="flex items-center gap-2 py-1">
-              {/* Search Filter in Events */}
               <div className="relative flex items-center">
                 <Search className="w-3 h-3 absolute left-2 text-slate-500 pointer-events-none" />
                 <input
@@ -415,7 +383,6 @@ export const WebSocketWorkbench: React.FC<WebSocketWorkbenchProps> = ({
             </div>
           </div>
 
-          {/* Event Stream Container */}
           <div className="flex-1 overflow-y-auto p-3 space-y-2 select-text">
             {filteredMessages.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-20 text-center text-[#777777] select-none">
@@ -447,21 +414,13 @@ export const WebSocketWorkbench: React.FC<WebSocketWorkbenchProps> = ({
                   );
                 }
 
-                const isJson = (() => {
-                  try {
-                    JSON.parse(msg.data);
-                    return true;
-                  } catch {
-                    return false;
-                  }
-                })();
+                const isJson = isValidJsonString(msg.data);
 
                 return (
                   <div
                     key={msg.id}
                     className="rounded-md border bg-[#222224] border-[#333333] hover:border-[#444444] transition-all overflow-hidden shadow-xs group"
                   >
-                    {/* Event Card Header */}
                     <div className="flex items-center justify-between px-3 py-1.5 bg-[#1a1a1a] border-b border-[#333333] select-none">
                       <div className="flex items-center gap-2">
                         {isSent ? (
@@ -490,7 +449,6 @@ export const WebSocketWorkbench: React.FC<WebSocketWorkbenchProps> = ({
                           {new Date(msg.timestamp).toLocaleTimeString()}
                         </span>
 
-                        {/* Replay action: Load payload into composer */}
                         <button
                           type="button"
                           onClick={() => handleReplayMessage(msg.id, msg.data)}
@@ -504,10 +462,9 @@ export const WebSocketWorkbench: React.FC<WebSocketWorkbenchProps> = ({
                           )}
                         </button>
 
-                        {/* Copy payload button */}
                         <button
                           type="button"
-                          onClick={() => handleCopyMessage(msg.id, msg.data)}
+                          onClick={() => copyMessage(msg.id, msg.data)}
                           className="text-[#888888] hover:text-white p-1 rounded hover:bg-[#26292b] transition-colors cursor-pointer opacity-0 group-hover:opacity-100"
                           title="Copy event payload"
                         >
@@ -520,7 +477,6 @@ export const WebSocketWorkbench: React.FC<WebSocketWorkbenchProps> = ({
                       </div>
                     </div>
 
-                    {/* Event Card Payload */}
                     <pre className="p-3 font-mono text-xs text-[#cccccc] whitespace-pre-wrap select-text leading-relaxed bg-[#1a1a1a] selection:bg-[#d99b26]/30 overflow-x-auto">
                       {msg.data}
                     </pre>

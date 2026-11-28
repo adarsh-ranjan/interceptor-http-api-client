@@ -1,4 +1,5 @@
 import { Environment, HttpRequest, KeyValuePair, FormDataItem, AuthConfig } from '../types';
+import { generateUuidV4 } from './id';
 
 export interface VariableMatch {
   fullMatch: string;
@@ -14,6 +15,60 @@ export interface VariableResolutionInfo {
   source: 'environment' | 'global' | 'dynamic' | 'unresolved';
   sourceName: string;
   error?: string;
+}
+
+const DYNAMIC_VARIABLE_GENERATORS: Record<string, () => string> = {
+  $guid: generateUuidV4,
+  $uuid: generateUuidV4,
+  $timestamp: () => Date.now().toString(),
+  $isoTimestamp: () => new Date().toISOString(),
+  $randomInt: () => Math.floor(Math.random() * 1000 + 1).toString(),
+};
+
+function describeDynamicVariable(trimmed: string): string | null {
+  switch (trimmed) {
+    case '$guid':
+    case '$uuid':
+      return `Generates a random v4 UUID (e.g. ${generateUuidV4()})`;
+    case '$timestamp':
+      return `Current Unix timestamp (e.g. ${Date.now()})`;
+    case '$isoTimestamp':
+      return `Current ISO 8601 timestamp (e.g. ${new Date().toISOString()})`;
+    case '$randomInt':
+      return `Random integer 1-1000 (e.g. ${Math.floor(Math.random() * 1000 + 1)})`;
+    default:
+      return null;
+  }
+}
+
+function resolveFromEnvironment(
+  trimmed: string,
+  env: Environment,
+  source: 'environment' | 'global',
+  sourceName: string,
+  disabledError: string
+): VariableResolutionInfo | null {
+  const matched = env.variables?.find((v) => v.key.trim() === trimmed);
+  if (!matched) return null;
+
+  if (matched.enabled) {
+    return {
+      name: trimmed,
+      value: matched.value,
+      isResolved: true,
+      source,
+      sourceName,
+    };
+  }
+
+  return {
+    name: trimmed,
+    value: matched.value,
+    isResolved: false,
+    source: 'unresolved',
+    sourceName,
+    error: disabledError,
+  };
 }
 
 /**
@@ -73,102 +128,38 @@ export function resolveVariableInfo(
 ): VariableResolutionInfo {
   const trimmed = varName.trim();
 
-  // Dynamic system variables
-  if (trimmed === '$guid' || trimmed === '$uuid') {
+  const dynamicDescription = describeDynamicVariable(trimmed);
+  if (dynamicDescription !== null) {
     return {
       name: trimmed,
-      value: 'Generates a random v4 UUID (e.g. ' + 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-        const r = (Math.random() * 16) | 0;
-        const v = c === 'x' ? r : (r & 0x3) | 0x8;
-        return v.toString(16);
-      }) + ')',
+      value: dynamicDescription,
       isResolved: true,
       source: 'dynamic',
       sourceName: 'Dynamic Generator',
     };
   }
 
-  if (trimmed === '$timestamp') {
-    return {
-      name: trimmed,
-      value: `Current Unix timestamp (e.g. ${Date.now()})`,
-      isResolved: true,
-      source: 'dynamic',
-      sourceName: 'Dynamic Generator',
-    };
+  if (activeEnv) {
+    const activeResult = resolveFromEnvironment(
+      trimmed,
+      activeEnv,
+      'environment',
+      activeEnv.name,
+      `Variable is disabled in '${activeEnv.name}' environment`
+    );
+    if (activeResult) return activeResult;
   }
 
-  if (trimmed === '$isoTimestamp') {
-    return {
-      name: trimmed,
-      value: `Current ISO 8601 timestamp (e.g. ${new Date().toISOString()})`,
-      isResolved: true,
-      source: 'dynamic',
-      sourceName: 'Dynamic Generator',
-    };
-  }
-
-  if (trimmed === '$randomInt') {
-    return {
-      name: trimmed,
-      value: `Random integer 1-1000 (e.g. ${Math.floor(Math.random() * 1000 + 1)})`,
-      isResolved: true,
-      source: 'dynamic',
-      sourceName: 'Dynamic Generator',
-    };
-  }
-
-  // Active environment variable
-  if (activeEnv && activeEnv.variables) {
-    const matched = activeEnv.variables.find((v) => v.key.trim() === trimmed);
-    if (matched) {
-      if (matched.enabled) {
-        return {
-          name: trimmed,
-          value: matched.value,
-          isResolved: true,
-          source: 'environment',
-          sourceName: activeEnv.name,
-        };
-      } else {
-        return {
-          name: trimmed,
-          value: matched.value,
-          isResolved: false,
-          source: 'unresolved',
-          sourceName: activeEnv.name,
-          error: `Variable is disabled in '${activeEnv.name}' environment`,
-        };
-      }
-    }
-  }
-
-  // Global environment if present
-  if (environments) {
-    const globalEnv = environments.find((e) => e.isGlobal);
-    if (globalEnv && globalEnv.variables) {
-      const matched = globalEnv.variables.find((v) => v.key.trim() === trimmed);
-      if (matched) {
-        if (matched.enabled) {
-          return {
-            name: trimmed,
-            value: matched.value,
-            isResolved: true,
-            source: 'global',
-            sourceName: 'Globals',
-          };
-        } else {
-          return {
-            name: trimmed,
-            value: matched.value,
-            isResolved: false,
-            source: 'unresolved',
-            sourceName: 'Globals',
-            error: 'Variable is disabled in global environment',
-          };
-        }
-      }
-    }
+  const globalEnv = environments?.find((e) => e.isGlobal);
+  if (globalEnv) {
+    const globalResult = resolveFromEnvironment(
+      trimmed,
+      globalEnv,
+      'global',
+      'Globals',
+      'Variable is disabled in global environment'
+    );
+    if (globalResult) return globalResult;
   }
 
   // Unresolved variable
@@ -218,31 +209,13 @@ export function interpolateString(
 
   return text.replace(/\{\{([^{}]+)\}\}/g, (match, varName) => {
     const trimmed = varName.trim();
-
-    if (trimmed === '$guid' || trimmed === '$uuid') {
-      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-        const r = (Math.random() * 16) | 0;
-        const v = c === 'x' ? r : (r & 0x3) | 0x8;
-        return v.toString(16);
-      });
+    const generator = DYNAMIC_VARIABLE_GENERATORS[trimmed];
+    if (generator) {
+      return generator();
     }
-
-    if (trimmed === '$timestamp') {
-      return Date.now().toString();
-    }
-
-    if (trimmed === '$isoTimestamp') {
-      return new Date().toISOString();
-    }
-
-    if (trimmed === '$randomInt') {
-      return Math.floor(Math.random() * 1000 + 1).toString();
-    }
-
     if (variables[trimmed] !== undefined) {
       return variables[trimmed];
     }
-
     return match;
   });
 }

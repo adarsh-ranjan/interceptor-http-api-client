@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { VariableResolutionInfo } from '../utils/variables';
-import { Copy, Check, AlertCircle, ExternalLink, Sparkles, Globe, Layers } from 'lucide-react';
+import { AlertCircle, Check, Copy, ExternalLink, Globe, Layers, Sparkles } from 'lucide-react';
+import { useClipboard } from '../hooks/useClipboard';
 
 interface VariableHoverTooltipProps {
   info: VariableResolutionInfo;
@@ -19,20 +20,20 @@ export const VariableHoverTooltip: React.FC<VariableHoverTooltipProps> = ({
   onMouseLeave,
   onOpenEnvModal,
 }) => {
-  const [copied, setCopied] = useState(false);
+  const { copied, copy } = useClipboard(1800);
 
   const handleCopy = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (info.isResolved && info.value) {
-      navigator.clipboard.writeText(info.value);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1800);
+      copy(info.value);
     }
   };
 
-  // Clamp x position so tooltip stays within the window
   const tooltipWidth = 320;
-  const clampedX = Math.max(16, Math.min(window.innerWidth - tooltipWidth - 16, x - tooltipWidth / 2));
+  const clampedX = Math.max(
+    16,
+    Math.min(window.innerWidth - tooltipWidth - 16, x - tooltipWidth / 2)
+  );
 
   const getSourceIcon = () => {
     switch (info.source) {
@@ -54,7 +55,6 @@ export const VariableHoverTooltip: React.FC<VariableHoverTooltipProps> = ({
       onMouseLeave={onMouseLeave}
       className="fixed z-50 w-80 bg-[#222224] border border-[#333333] rounded-md shadow-2xl p-3 text-xs text-[#cccccc] backdrop-blur-md animate-in fade-in zoom-in-95 duration-150 select-none"
     >
-      {/* Header */}
       <div className="flex items-center justify-between gap-2 pb-2 mb-2 border-b border-[#333333]">
         <div className="flex items-center gap-1.5 min-w-0">
           <span className="font-mono font-bold text-[#d99b26] text-xs truncate">
@@ -74,7 +74,6 @@ export const VariableHoverTooltip: React.FC<VariableHoverTooltipProps> = ({
         </div>
       </div>
 
-      {/* Value Content */}
       <div className="space-y-1.5">
         <div className="flex items-center justify-between text-[10px] font-medium text-[#888888] uppercase tracking-wider">
           <span>Actual Value</span>
@@ -112,7 +111,6 @@ export const VariableHoverTooltip: React.FC<VariableHoverTooltipProps> = ({
         )}
       </div>
 
-      {/* Scope Footer */}
       <div className="flex items-center justify-between text-[11px] text-[#888888] pt-2 mt-2 border-t border-[#333333]">
         <div className="flex items-center gap-1.5 truncate">
           {getSourceIcon()}

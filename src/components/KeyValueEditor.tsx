@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { KeyValuePair, Environment } from '../types';
-import { Trash2, HelpCircle } from 'lucide-react';
+import { Environment, KeyValuePair } from '../types';
+import { generateId } from '../utils/id';
+import { HelpCircle, Trash2 } from 'lucide-react';
 import { VariableInput } from './VariableInput';
 
 interface KeyValueEditorProps {
@@ -32,8 +33,7 @@ export const KeyValueEditor: React.FC<KeyValueEditorProps> = ({
   const [bulkText, setBulkText] = useState('');
 
   const handleUpdate = (id: string, field: keyof KeyValuePair, value: any) => {
-    const updated = items.map((item) => (item.id === id ? { ...item, [field]: value } : item));
-    onChange(updated);
+    onChange(items.map((item) => (item.id === id ? { ...item, [field]: value } : item)));
   };
 
   const handleDelete = (id: string) => {
@@ -41,8 +41,7 @@ export const KeyValueEditor: React.FC<KeyValueEditorProps> = ({
   };
 
   const handleToggle = (id: string) => {
-    const updated = items.map((item) => (item.id === id ? { ...item, enabled: !item.enabled } : item));
-    onChange(updated);
+    onChange(items.map((item) => (item.id === id ? { ...item, enabled: !item.enabled } : item)));
   };
 
   const handleToggleAll = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -50,39 +49,35 @@ export const KeyValueEditor: React.FC<KeyValueEditorProps> = ({
     onChange(items.map((i) => ({ ...i, enabled: checked })));
   };
 
-  // When typing into the new row placeholder
   const handleAddNewRow = (field: 'key' | 'value' | 'description', val: string) => {
     if (!val.trim() && field === 'key') return;
-    const newItem: KeyValuePair = {
-      id: Math.random().toString(36).substring(2, 9),
-      key: field === 'key' ? val : '',
-      value: field === 'value' ? val : '',
-      description: field === 'description' ? val : '',
-      enabled: true,
-    };
-    onChange([...items, newItem]);
+    onChange([
+      ...items,
+      {
+        id: generateId(),
+        key: field === 'key' ? val : '',
+        value: field === 'value' ? val : '',
+        description: field === 'description' ? val : '',
+        enabled: true,
+      },
+    ]);
   };
 
   const handleStartBulkEdit = () => {
-    const text = items
-      .map((item) => `${item.key || ''}:${item.value || ''}`)
-      .join('\n');
-    setBulkText(text);
+    setBulkText(items.map((item) => `${item.key || ''}:${item.value || ''}`).join('\n'));
     setIsBulkEdit(true);
   };
 
   const handleSaveBulkEdit = () => {
-    const lines = bulkText.split('\n');
-    const newItems: KeyValuePair[] = lines
+    const newItems: KeyValuePair[] = bulkText
+      .split('\n')
       .filter((line) => line.trim().length > 0)
       .map((line) => {
         const colonIndex = line.indexOf(':');
-        const key = colonIndex !== -1 ? line.slice(0, colonIndex).trim() : line.trim();
-        const value = colonIndex !== -1 ? line.slice(colonIndex + 1).trim() : '';
         return {
-          id: Math.random().toString(36).substring(2, 9),
-          key,
-          value,
+          id: generateId(),
+          key: colonIndex !== -1 ? line.slice(0, colonIndex).trim() : line.trim(),
+          value: colonIndex !== -1 ? line.slice(colonIndex + 1).trim() : '',
           enabled: true,
           description: '',
         };
@@ -91,12 +86,39 @@ export const KeyValueEditor: React.FC<KeyValueEditorProps> = ({
     setIsBulkEdit(false);
   };
 
+  const renderQuickAddCell = (
+    field: 'key' | 'value' | 'description',
+    placeholder: string,
+    isMono = true
+  ) => (
+    <td className="border-b border-r border-[#333333] p-0">
+      <input
+        type="text"
+        placeholder={placeholder}
+        onBlur={(e) => {
+          if (e.target.value.trim()) {
+            handleAddNewRow(field, e.target.value);
+            e.target.value = '';
+          }
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && e.currentTarget.value.trim()) {
+            handleAddNewRow(field, e.currentTarget.value);
+            e.currentTarget.value = '';
+          }
+        }}
+        className={`w-full bg-transparent px-2.5 py-1 text-xs text-[#cccccc] placeholder:text-[#555555] outline-none ${
+          isMono ? 'font-mono' : ''
+        }`}
+      />
+    </td>
+  );
+
   const allChecked = items.length > 0 && items.every((i) => i.enabled);
   const someChecked = items.some((i) => i.enabled);
 
   return (
     <div className="flex flex-col h-full overflow-y-auto px-4 py-3 select-none text-xs">
-      {/* Section Title */}
       <div className="mb-2 flex items-center justify-between">
         <span className="font-semibold text-xs text-[#888888]">{title}</span>
       </div>
@@ -126,7 +148,6 @@ export const KeyValueEditor: React.FC<KeyValueEditorProps> = ({
         </div>
       ) : (
         <>
-          {/* Bruno EditableTable */}
           <div className="border border-[#333333] rounded overflow-clip bg-[#1a1a1a]">
             <table className="w-full border-collapse table-fixed text-xs">
               <thead>
@@ -156,10 +177,7 @@ export const KeyValueEditor: React.FC<KeyValueEditorProps> = ({
               </thead>
               <tbody>
                 {items.map((item) => (
-                  <tr
-                    key={item.id}
-                    className="h-8 hover:bg-[#222224] transition-colors group"
-                  >
+                  <tr key={item.id} className="h-8 hover:bg-[#222224] transition-colors group">
                     <td className="w-8 text-center border-b border-r border-[#333333] p-0">
                       <input
                         type="checkbox"
@@ -211,75 +229,19 @@ export const KeyValueEditor: React.FC<KeyValueEditorProps> = ({
                   </tr>
                 ))}
 
-                {/* Always-visible Empty Row for quick inline addition (Bruno style) */}
                 <tr className="h-8 hover:bg-[#222224] transition-colors">
                   <td className="w-8 text-center border-b border-r border-[#333333] p-0 opacity-40">
                     <input type="checkbox" disabled className="accent-[#d99b26]" />
                   </td>
-                  <td className="border-b border-r border-[#333333] p-0">
-                    <input
-                      type="text"
-                      placeholder="Name"
-                      onBlur={(e) => {
-                        if (e.target.value.trim()) {
-                          handleAddNewRow('key', e.target.value);
-                          e.target.value = '';
-                        }
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && e.currentTarget.value.trim()) {
-                          handleAddNewRow('key', e.currentTarget.value);
-                          e.currentTarget.value = '';
-                        }
-                      }}
-                      className="w-full bg-transparent px-2.5 py-1 text-xs text-[#cccccc] placeholder:text-[#555555] outline-none font-mono"
-                    />
-                  </td>
-                  <td className="border-b border-r border-[#333333] p-0">
-                    <input
-                      type="text"
-                      placeholder="Value"
-                      onBlur={(e) => {
-                        if (e.target.value.trim()) {
-                          handleAddNewRow('value', e.target.value);
-                          e.target.value = '';
-                        }
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && e.currentTarget.value.trim()) {
-                          handleAddNewRow('value', e.currentTarget.value);
-                          e.currentTarget.value = '';
-                        }
-                      }}
-                      className="w-full bg-transparent px-2.5 py-1 text-xs text-[#cccccc] placeholder:text-[#555555] outline-none font-mono"
-                    />
-                  </td>
-                  <td className="border-b border-r border-[#333333] p-0">
-                    <input
-                      type="text"
-                      placeholder="Description"
-                      onBlur={(e) => {
-                        if (e.target.value.trim()) {
-                          handleAddNewRow('description', e.target.value);
-                          e.target.value = '';
-                        }
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && e.currentTarget.value.trim()) {
-                          handleAddNewRow('description', e.currentTarget.value);
-                          e.currentTarget.value = '';
-                        }
-                      }}
-                      className="w-full bg-transparent px-2.5 py-1 text-xs text-[#cccccc] placeholder:text-[#555555] outline-none"
-                    />
-                  </td>
+                  {renderQuickAddCell('key', 'Name', true)}
+                  {renderQuickAddCell('value', 'Value', true)}
+                  {renderQuickAddCell('description', 'Description', false)}
                   <td className="w-8 border-b border-[#333333] p-0"></td>
                 </tr>
               </tbody>
             </table>
           </div>
 
-          {/* Bulk Edit Button (matches Image 4) */}
           <div className="flex justify-end mt-2">
             <button
               onClick={handleStartBulkEdit}
@@ -289,12 +251,14 @@ export const KeyValueEditor: React.FC<KeyValueEditorProps> = ({
             </button>
           </div>
 
-          {/* Path Parameters Section (matches Image 4) */}
           {showPathParams && (
             <div className="mt-4">
               <div className="flex items-center gap-1.5 mb-2">
                 <span className="font-semibold text-xs text-[#888888]">Path</span>
-                <HelpCircle className="w-3.5 h-3.5 text-[#666666]" title="Path variables are automatically extracted from URL patterns like :param" />
+                <HelpCircle
+                  className="w-3.5 h-3.5 text-[#666666]"
+                  title="Path variables are automatically extracted from URL patterns like :param"
+                />
               </div>
             </div>
           )}
@@ -303,4 +267,3 @@ export const KeyValueEditor: React.FC<KeyValueEditorProps> = ({
     </div>
   );
 };
-

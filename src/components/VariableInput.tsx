@@ -1,14 +1,11 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef } from 'react';
 import { Environment } from '../types';
-import {
-  extractVariablesFromText,
-  findVariableAtCharIndex,
-  resolveVariableInfo,
-  VariableResolutionInfo,
-} from '../utils/variables';
+import { extractVariablesFromText, resolveVariableInfo } from '../utils/variables';
+import { useVariableHover } from '../hooks/useVariableHover';
 import { VariableHoverTooltip } from './VariableHoverTooltip';
 
-export interface VariableInputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'onChange'> {
+export interface VariableInputProps
+  extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'onChange'> {
   value: string;
   onChange: (value: string) => void;
   activeEnvironment?: Environment;
@@ -33,50 +30,18 @@ export const VariableInput: React.FC<VariableInputProps> = ({
 }) => {
   const inputRef = useRef<HTMLInputElement>(null);
   const backdropRef = useRef<HTMLDivElement>(null);
-  const charWidthRef = useRef<number>(0);
-  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const [hoveredVar, setHoveredVar] = useState<{
-    info: VariableResolutionInfo;
-    x: number;
-    y: number;
-  } | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
-    };
-  }, []);
-
-  const getCharWidth = (inputEl: HTMLInputElement): number => {
-    if (charWidthRef.current > 0) return charWidthRef.current;
-    try {
-      const style = window.getComputedStyle(inputEl);
-      const span = document.createElement('span');
-      span.style.font = style.font;
-      span.style.fontFamily = style.fontFamily;
-      span.style.fontSize = style.fontSize;
-      span.style.fontWeight = style.fontWeight;
-      span.style.letterSpacing = style.letterSpacing;
-      span.style.visibility = 'hidden';
-      span.style.position = 'absolute';
-      span.style.whiteSpace = 'pre';
-      span.textContent = 'M'.repeat(100);
-      document.body.appendChild(span);
-      const width = span.getBoundingClientRect().width / 100;
-      document.body.removeChild(span);
-      if (width > 0) {
-        charWidthRef.current = width;
-        return width;
-      }
-    } catch {
-      // fallback
-    }
-    return 7.2;
-  };
+  const {
+    hoveredVar,
+    clearHoveredVar,
+    handleSingleLineMouseMove,
+    handleMouseLeave,
+    handleTooltipMouseEnter,
+    handleTooltipMouseLeave,
+  } = useVariableHover({ activeEnvironment, environments, defaultPaddingLeft: 10 });
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setHoveredVar(null);
+    clearHoveredVar();
     onChange(e.target.value);
   };
 
@@ -84,63 +49,6 @@ export const VariableInput: React.FC<VariableInputProps> = ({
     if (backdropRef.current && inputRef.current) {
       backdropRef.current.scrollLeft = inputRef.current.scrollLeft;
     }
-  };
-
-  const handleMouseMove = (e: React.MouseEvent<HTMLInputElement>) => {
-    if (type === 'password' || !inputRef.current || !value) return;
-    const input = inputRef.current;
-    const rect = input.getBoundingClientRect();
-    const style = window.getComputedStyle(input);
-    const paddingLeft = parseFloat(style.paddingLeft) || 10;
-
-    const charWidth = getCharWidth(input);
-    if (charWidth <= 0) return;
-
-    const mouseX = e.clientX - rect.left - paddingLeft + input.scrollLeft;
-    if (mouseX < 0) {
-      if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
-      hoverTimeoutRef.current = setTimeout(() => setHoveredVar(null), 100);
-      return;
-    }
-
-    const charIndex = Math.floor(mouseX / charWidth);
-    const matched = findVariableAtCharIndex(value, charIndex);
-
-    if (matched) {
-      if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
-      const info = resolveVariableInfo(matched.varName, activeEnvironment, environments);
-      const varStartPx = rect.left + paddingLeft + (matched.startIndex * charWidth) - input.scrollLeft;
-      const varWidthPx = (matched.endIndex - matched.startIndex) * charWidth;
-      const x = varStartPx + varWidthPx / 2;
-      const y = rect.bottom + 6;
-
-      setHoveredVar({
-        info,
-        x,
-        y,
-      });
-    } else {
-      if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
-      hoverTimeoutRef.current = setTimeout(() => {
-        setHoveredVar(null);
-      }, 120);
-    }
-  };
-
-  const handleMouseLeave = () => {
-    if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
-    hoverTimeoutRef.current = setTimeout(() => {
-      setHoveredVar(null);
-    }, 180);
-  };
-
-  const handleTooltipMouseEnter = () => {
-    if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
-  };
-
-  const handleTooltipMouseLeave = () => {
-    if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
-    setHoveredVar(null);
   };
 
   const renderBackdropContent = () => {
@@ -154,9 +62,7 @@ export const VariableInput: React.FC<VariableInputProps> = ({
     vars.forEach((v, idx) => {
       if (v.startIndex > lastIndex) {
         elements.push(
-          <span key={`plain-${lastIndex}`}>
-            {value.substring(lastIndex, v.startIndex)}
-          </span>
+          <span key={`plain-${lastIndex}`}>{value.substring(lastIndex, v.startIndex)}</span>
         );
       }
 
@@ -177,11 +83,7 @@ export const VariableInput: React.FC<VariableInputProps> = ({
     });
 
     if (lastIndex < value.length) {
-      elements.push(
-        <span key={`plain-${lastIndex}`}>
-          {value.substring(lastIndex)}
-        </span>
-      );
+      elements.push(<span key={`plain-${lastIndex}`}>{value.substring(lastIndex)}</span>);
     }
 
     return elements;
@@ -191,7 +93,6 @@ export const VariableInput: React.FC<VariableInputProps> = ({
     <div
       className={`relative flex items-center bg-[#1a1a1a] border border-[#333333] rounded overflow-hidden focus-within:border-[#444444] transition-colors ${wrapperClassName}`}
     >
-      {/* Variable Highlight Backdrop */}
       <div
         ref={backdropRef}
         className="absolute inset-0 pointer-events-none flex items-center overflow-hidden px-2.5 py-1 text-xs font-mono whitespace-pre select-none text-transparent"
@@ -205,7 +106,10 @@ export const VariableInput: React.FC<VariableInputProps> = ({
         type={type}
         value={value}
         onChange={handleInputChange}
-        onMouseMove={handleMouseMove}
+        onMouseMove={(e) => {
+          if (type === 'password' || !value) return;
+          handleSingleLineMouseMove(e, value);
+        }}
         onMouseLeave={handleMouseLeave}
         onScroll={handleScroll}
         onKeyDown={onKeyDown}
@@ -215,7 +119,6 @@ export const VariableInput: React.FC<VariableInputProps> = ({
         {...restProps}
       />
 
-      {/* Variable Hover Tooltip */}
       {hoveredVar && (
         <VariableHoverTooltip
           info={hoveredVar.info}

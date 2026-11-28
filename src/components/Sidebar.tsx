@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { HistoryItem, HttpRequest, Collection, Environment } from '../types';
-import { CollectionsView } from './CollectionsView';
+import { Collection, Environment, HistoryItem, HttpRequest } from '../types';
 import { getMethodColor, getStatusColor } from '../utils/http';
-import { History, FolderTree, Trash2, Zap, FileCode, Server, Plus, Clock } from 'lucide-react';
+import { CollectionsView } from './CollectionsView';
+import { Clock, FileCode, Plus, Server } from 'lucide-react';
 
 interface SidebarProps {
   history: HistoryItem[];
@@ -22,58 +22,6 @@ interface SidebarProps {
   activeSection?: 'requests' | 'mock-servers';
   runningMockServerCount?: number;
 }
-
-const PRESETS: { name: string; request: HttpRequest }[] = [
-  {
-    name: 'Get All Posts',
-    request: {
-      id: 'preset-1',
-      name: 'Get All Posts',
-      method: 'GET',
-      url: 'https://jsonplaceholder.typicode.com/posts?_limit=5',
-      params: [{ id: 'p1', key: '_limit', value: '5', enabled: true }],
-      headers: [{ id: 'h1', key: 'Accept', value: 'application/json', enabled: true }],
-      bodyType: 'none',
-      bodyContent: '',
-    },
-  },
-  {
-    name: 'Create Post',
-    request: {
-      id: 'preset-2',
-      name: 'Create Post',
-      method: 'POST',
-      url: 'https://jsonplaceholder.typicode.com/posts',
-      params: [],
-      headers: [
-        { id: 'h1', key: 'Content-Type', value: 'application/json', enabled: true },
-      ],
-      bodyType: 'json',
-      bodyContent: JSON.stringify(
-        {
-          title: 'Interceptor Test Request',
-          body: 'Testing cross-platform desktop API client with Electron & React',
-          userId: 1,
-        },
-        null,
-        2
-      ),
-    },
-  },
-  {
-    name: 'HttpBin Echo',
-    request: {
-      id: 'preset-3',
-      name: 'HttpBin Echo',
-      method: 'POST',
-      url: 'https://httpbin.org/post',
-      params: [],
-      headers: [{ id: 'h1', key: 'Content-Type', value: 'application/json', enabled: true }],
-      bodyType: 'json',
-      bodyContent: JSON.stringify({ message: 'Hello from Interceptor!' }, null, 2),
-    },
-  },
-];
 
 export const Sidebar: React.FC<SidebarProps> = ({
   history,
@@ -98,7 +46,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
       style={{ width: `${width}px` }}
       className="shrink-0 bg-[#1a1a1a] border-r border-[#333333] flex flex-col h-full text-xs select-none"
     >
-      {/* Collections Content (Header is inside CollectionsView matching Bruno Image 4) */}
       <div className="flex-1 overflow-hidden flex flex-col bg-[#1a1a1a]">
         {showHistory ? (
           <div className="flex flex-col h-full bg-[#1a1a1a]">
@@ -150,9 +97,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                           {item.url.replace(/^https?:\/\//, '')}
                         </span>
                         {item.status > 0 && (
-                          <span
-                            className={`font-mono text-[9px] px-1 py-0.2 rounded ${statusColor.text}`}
-                          >
+                          <span className={`font-mono text-[9px] px-1 py-0.2 rounded ${statusColor.text}`}>
                             {item.status}
                           </span>
                         )}
@@ -177,7 +122,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
         )}
       </div>
 
-      {/* Bottom Bruno Sidebar Sections: API Specs & Mock Servers (matches Image 4) */}
       <div className="border-t border-[#333333] bg-[#1a1a1a] text-[#888888]">
         <div className="flex items-center justify-between px-3 py-2 text-xs hover:text-[#cccccc] hover:bg-[#222224] cursor-pointer transition-colors group">
           <div className="flex items-center gap-2">
@@ -195,10 +139,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
           }`}
         >
           <div className="flex items-center gap-2">
-            <Server className={`w-3.5 h-3.5 ${activeSection === 'mock-servers' ? 'text-[#d99b26]' : 'text-[#777777] group-hover:text-[#cccccc]'}`} />
+            <Server
+              className={`w-3.5 h-3.5 ${
+                activeSection === 'mock-servers'
+                  ? 'text-[#d99b26]'
+                  : 'text-[#777777] group-hover:text-[#cccccc]'
+              }`}
+            />
             <span>Mock Servers</span>
             {runningMockServerCount > 0 && (
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse ml-0.5" title={`${runningMockServerCount} server(s) running`} />
+              <span
+                className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse ml-0.5"
+                title={`${runningMockServerCount} server(s) running`}
+              />
             )}
           </div>
           <button
@@ -226,4 +179,3 @@ export const Sidebar: React.FC<SidebarProps> = ({
     </aside>
   );
 };
-

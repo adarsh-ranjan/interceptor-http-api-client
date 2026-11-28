@@ -1,6 +1,7 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { Environment } from '../types';
-import { Globe, Settings, ChevronDown, Check } from 'lucide-react';
+import { Check, ChevronDown, Settings } from 'lucide-react';
+import { useDismissibleLayer } from '../hooks/useDismissibleLayer';
 
 interface EnvironmentSelectorProps {
   environments: Environment[];
@@ -17,23 +18,20 @@ export const EnvironmentSelector: React.FC<EnvironmentSelectorProps> = ({
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const refs = useMemo(() => [dropdownRef], []);
+
+  useDismissibleLayer({
+    isOpen,
+    onClose: () => setIsOpen(false),
+    refs,
+    closeOnScroll: false,
+  });
 
   const activeEnv = environments.find((e) => e.id === activeEnvId);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
 
   return (
     <div className="relative" ref={dropdownRef}>
       <div className="flex items-center gap-1 bg-[#222224] border border-[#333333] rounded-md p-0.5">
-        {/* Environment Picker Button (Bruno style) */}
         <button
           onClick={() => setIsOpen(!isOpen)}
           className="flex items-center gap-2 px-2.5 py-1 text-xs text-[#cccccc] hover:text-white rounded hover:bg-[#2e3235] transition-colors cursor-pointer"
@@ -50,7 +48,6 @@ export const EnvironmentSelector: React.FC<EnvironmentSelectorProps> = ({
           <ChevronDown className="w-3 h-3 text-[#777777]" />
         </button>
 
-        {/* Manage Settings Gear Button */}
         <button
           onClick={onOpenManageModal}
           className="p-1 text-[#888888] hover:text-[#d99b26] rounded hover:bg-[#2e3235] transition-colors cursor-pointer"
@@ -60,7 +57,6 @@ export const EnvironmentSelector: React.FC<EnvironmentSelectorProps> = ({
         </button>
       </div>
 
-      {/* Dropdown Menu */}
       {isOpen && (
         <div className="absolute right-0 top-full mt-1 w-52 bg-[#222224] border border-[#333333] rounded-md shadow-2xl z-30 py-1 text-xs select-none">
           <div className="px-3 py-1.5 text-[10px] uppercase font-bold text-[#888888] border-b border-[#333333]">

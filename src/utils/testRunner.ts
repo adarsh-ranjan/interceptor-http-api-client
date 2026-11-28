@@ -1,5 +1,6 @@
 import { HttpResponse, TestResult, Environment } from '../types';
 import { getVariableMap, interpolateString } from './variables';
+import { generateId } from './id';
 
 export function runTestScript(
   scriptText: string,
@@ -73,7 +74,7 @@ export function runTestScript(
 
   const interceptorContext = {
     test: (name: string, fn: () => void) => {
-      const id = Math.random().toString(36).substring(2, 9);
+      const id = generateId();
       try {
         fn();
         results.push({ id, name, passed: true });
