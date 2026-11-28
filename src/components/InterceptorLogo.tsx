@@ -23,21 +23,21 @@ export const InterceptorLogo: React.FC<InterceptorLogoProps> = ({
     >
       <defs>
         <linearGradient id="interceptorGold" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stop-color="#fef08a" />
-          <stop offset="40%" stop-color="#fbbf24" />
-          <stop offset="75%" stop-color="#d97706" />
-          <stop offset="100%" stop-color="#92400e" />
+          <stop offset="0%" stopColor="#fef08a" />
+          <stop offset="40%" stopColor="#fbbf24" />
+          <stop offset="75%" stopColor="#d97706" />
+          <stop offset="100%" stopColor="#92400e" />
         </linearGradient>
 
         <linearGradient id="interceptorCore" x1="0%" y1="0%" x2="0%" y2="100%">
-          <stop offset="0%" stop-color="#ffffff" />
-          <stop offset="50%" stop-color="#fef08a" />
-          <stop offset="100%" stop-color="#f59e0b" />
+          <stop offset="0%" stopColor="#ffffff" />
+          <stop offset="50%" stopColor="#fef08a" />
+          <stop offset="100%" stopColor="#f59e0b" />
         </linearGradient>
 
         <radialGradient id="interceptorGlow" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stop-color="#f59e0b" stop-opacity="0.3" />
-          <stop offset="100%" stop-color="#f59e0b" stop-opacity="0" />
+          <stop offset="0%" stopColor="#f59e0b" stopOpacity="0.3" />
+          <stop offset="100%" stopColor="#f59e0b" stopOpacity="0" />
         </radialGradient>
       </defs>
 

@@ -212,6 +212,19 @@ declare global {
         content: string;
         filters?: { name: string; extensions: string[] }[];
       }) => Promise<boolean>;
+      mockServer?: {
+        startServer: (server: import('./server').MockServer) => Promise<{ success: boolean; error?: string }>;
+        stopServer: (serverId: string) => Promise<{ success: boolean; error?: string }>;
+        stopAllServers: () => Promise<{ success: boolean }>;
+        getStore?: (serverId: string) => Promise<Record<string, any>>;
+        clearStore?: (serverId: string) => Promise<boolean>;
+        setStore?: (serverId: string, data: Record<string, any>) => Promise<boolean>;
+        onServerLog: (callback: (log: import('./server').ServerLogEntry) => void) => () => void;
+        onServerStatusChange: (callback: (data: { serverId: string; status: import('./server').ServerStatus; error?: string }) => void) => () => void;
+      };
     };
   }
 }
+
+export * from './server';
+

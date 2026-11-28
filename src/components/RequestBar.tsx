@@ -1,7 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { createPortal } from 'react-dom';
 import { HttpMethod, Environment } from '../types';
-import { getMethodColor } from '../utils/http';
 import { isCurlCommand, parseCurlCommand, ParsedCurlResult } from '../utils/curlParser';
 import {
   extractVariablesFromText,
@@ -10,7 +8,8 @@ import {
   VariableResolutionInfo,
 } from '../utils/variables';
 import { VariableHoverTooltip } from './VariableHoverTooltip';
-import { Check, Save, Code2 } from 'lucide-react';
+import { HttpMethodDropdown } from './HttpMethodDropdown';
+import { Save, Code2 } from 'lucide-react';
 
 interface RequestBarProps {
   method: HttpMethod;
@@ -28,18 +27,6 @@ interface RequestBarProps {
   isLoading: boolean;
   isDirty?: boolean;
 }
-
-const BRUNO_METHODS = [
-  'GET',
-  'POST',
-  'PUT',
-  'DELETE',
-  'PATCH',
-  'OPTIONS',
-  'HEAD',
-  'TRACE',
-  'CONNECT',
-] as const;
 
 export const RequestBar: React.FC<RequestBarProps> = ({
   method,
@@ -63,15 +50,8 @@ export const RequestBar: React.FC<RequestBarProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const backdropRef = useRef<HTMLDivElement>(null);
-  const methodButtonRef = useRef<HTMLButtonElement>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
   const charWidthRef = useRef<number>(0);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
-  const [isAddingCustom, setIsAddingCustom] = useState(false);
-  const [customInput, setCustomInput] = useState('');
 
   const [hoveredVar, setHoveredVar] = useState<{
     info: VariableResolutionInfo;
@@ -85,62 +65,6 @@ export const RequestBar: React.FC<RequestBarProps> = ({
       if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
     };
   }, []);
-
-  // Close method menu on outside click, Escape, or scroll
-  useEffect(() => {
-    if (!isMenuOpen) return;
-
-    const handlePointerDown = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      if (dropdownRef.current && dropdownRef.current.contains(target)) return;
-      if (methodButtonRef.current && methodButtonRef.current.contains(target)) return;
-      setIsMenuOpen(false);
-      setIsAddingCustom(false);
-    };
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setIsMenuOpen(false);
-        setIsAddingCustom(false);
-      }
-    };
-
-    const handleScroll = (e: Event) => {
-      if (dropdownRef.current && dropdownRef.current.contains(e.target as Node)) return;
-      setIsMenuOpen(false);
-      setIsAddingCustom(false);
-    };
-
-    document.addEventListener('mousedown', handlePointerDown);
-    document.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('scroll', handleScroll, true);
-    window.addEventListener('resize', handleScroll);
-
-    return () => {
-      document.removeEventListener('mousedown', handlePointerDown);
-      document.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('scroll', handleScroll, true);
-      window.removeEventListener('resize', handleScroll);
-    };
-  }, [isMenuOpen]);
-
-  const toggleMethodMenu = () => {
-    if (isMenuOpen) {
-      setIsMenuOpen(false);
-      setIsAddingCustom(false);
-      return;
-    }
-    // Align menu flush with the left boundary of the request URL bar
-    if (containerRef.current) {
-      const rect = containerRef.current.getBoundingClientRect();
-      setMenuPos({
-        top: rect.bottom + 4,
-        left: rect.left,
-      });
-      setIsMenuOpen(true);
-      setIsAddingCustom(false);
-    }
-  };
 
   const variablesInUrl = extractVariablesFromText(url);
 
@@ -314,9 +238,6 @@ export const RequestBar: React.FC<RequestBarProps> = ({
     return elements;
   };
 
-  const methodColor = getMethodColor(method);
-  const isCustomMethod = !BRUNO_METHODS.includes(method as any);
-
   return (
     <div className="flex items-center gap-2 px-4 pt-3 pb-2 bg-[#1a1a1a] w-full relative select-none">
       {/* Bruno-Style Integrated URL Input Box (QueryUrl) */}
@@ -325,15 +246,13 @@ export const RequestBar: React.FC<RequestBarProps> = ({
         className="flex-1 relative flex items-center bg-[#1a1a1a] border border-[#333333] rounded-md px-3 h-[34px] focus-within:border-[#444444] transition-colors"
       >
         {/* Method Label Button (Directly inside on the left, no borders, no chevron) */}
-        <button
-          ref={methodButtonRef}
-          type="button"
-          onClick={toggleMethodMenu}
-          className={`font-mono font-bold text-xs uppercase cursor-pointer hover:opacity-80 transition-opacity select-none mr-2.5 shrink-0 ${methodColor.text}`}
-          title="Change HTTP method"
-        >
-          {method}
-        </button>
+        <HttpMethodDropdown
+          variant="bare"
+          method={method}
+          onChange={(m) => onMethodChange(m as HttpMethod)}
+          anchorRef={containerRef}
+          className="mr-2.5"
+        />
 
         {/* URL Input with Variable Highlighting */}
         <div className="flex-1 relative flex items-center overflow-hidden h-full">
@@ -410,93 +329,6 @@ export const RequestBar: React.FC<RequestBarProps> = ({
         >
           Send
         </button>
-      )}
-
-      {/* Floating Bruno-style HTTP Method Menu (Aligned flush with input container left) */}
-      {isMenuOpen && menuPos && createPortal(
-        <div
-          ref={dropdownRef}
-          style={{
-            position: 'fixed',
-            top: `${menuPos.top}px`,
-            left: `${menuPos.left}px`,
-            zIndex: 9999,
-          }}
-          className="w-36 bg-[#222224] border border-[#333333] rounded-md shadow-2xl py-1 text-xs select-none backdrop-blur-md animate-in fade-in zoom-in-95 duration-100"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {BRUNO_METHODS.map((m) => {
-            const isSelected = method === m;
-            return (
-              <button
-                key={m}
-                type="button"
-                onClick={() => {
-                  onMethodChange(m);
-                  setIsMenuOpen(false);
-                }}
-                className={`w-full flex items-center justify-between px-3 py-1.5 font-mono text-xs text-left transition-colors cursor-pointer ${
-                  isSelected
-                    ? 'text-white bg-[#26292b] font-semibold'
-                    : 'text-[#cccccc] hover:text-white hover:bg-[#26292b]'
-                }`}
-              >
-                <span>{m}</span>
-                {isSelected && <Check className="w-3.5 h-3.5 text-[#d99b26]" />}
-              </button>
-            );
-          })}
-
-          {/* If current method is a custom method */}
-          {isCustomMethod && (
-            <div className="w-full flex items-center justify-between px-3 py-1.5 font-mono text-xs text-white bg-[#26292b] font-semibold border-t border-[#333333]">
-              <span className="truncate">{method}</span>
-              <Check className="w-3.5 h-3.5 text-[#d99b26] shrink-0" />
-            </div>
-          )}
-
-          <div className="my-1 border-t border-[#333333]" />
-
-          {/* Add Custom Method Option */}
-          {isAddingCustom ? (
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                if (customInput.trim()) {
-                  onMethodChange(customInput.trim().toUpperCase());
-                  setCustomInput('');
-                  setIsAddingCustom(false);
-                  setIsMenuOpen(false);
-                }
-              }}
-              className="px-2.5 py-1 flex items-center gap-1"
-            >
-              <input
-                type="text"
-                autoFocus
-                placeholder="METHOD"
-                value={customInput}
-                onChange={(e) => setCustomInput(e.target.value)}
-                className="w-full bg-[#1a1a1a] border border-[#d99b26] rounded px-1.5 py-0.5 text-xs font-mono uppercase text-white outline-none"
-              />
-              <button
-                type="submit"
-                className="px-1.5 py-0.5 bg-[#d99b26] hover:bg-[#c2871a] text-white rounded text-xs font-bold"
-              >
-                ✓
-              </button>
-            </form>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setIsAddingCustom(true)}
-              className="w-full flex items-center px-3 py-1.5 text-[#888888] hover:text-[#d99b26] hover:bg-[#26292b] font-mono text-xs text-left transition-colors cursor-pointer"
-            >
-              + Add Custom
-            </button>
-          )}
-        </div>,
-        document.body
       )}
 
       {/* Variable Hover Tooltip */}
