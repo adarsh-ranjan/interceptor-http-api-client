@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import path from 'path';
 import fs from 'fs';
 import tls from 'tls';
+import { MockServerManager } from './mockServerManager';
 
 // Trust the OS certificate store (where corporate/proxy root CAs live) in addition to
 // Node's bundled Mozilla roots, plus any PEM bundle in NODE_EXTRA_CA_CERTS.
@@ -23,6 +24,7 @@ configureTrustedCAs();
 
 let mainWindow: BrowserWindow | null = null;
 const activeRequests = new Map<string, AbortController>();
+const mockServerManager = new MockServerManager(() => mainWindow);
 
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
 
@@ -381,3 +383,33 @@ ipcMain.handle('dialog:saveFile', async (_event, options) => {
   await fs.promises.writeFile(filePath, options.content, 'utf-8');
   return true;
 });
+
+// IPC: Mock & Dynamic Server Manager
+ipcMain.handle('mock-server:start', async (_event, config) => {
+  return mockServerManager.startServer(config);
+});
+
+ipcMain.handle('mock-server:stop', async (_event, serverId: string) => {
+  return mockServerManager.stopServer(serverId);
+});
+
+ipcMain.handle('mock-server:stop-all', async () => {
+  return mockServerManager.stopAll();
+});
+
+ipcMain.handle('mock-server:get-store', async (_event, serverId: string) => {
+  return mockServerManager.getServerStore(serverId);
+});
+
+ipcMain.handle('mock-server:clear-store', async (_event, serverId: string) => {
+  return mockServerManager.clearServerStore(serverId);
+});
+
+ipcMain.handle('mock-server:set-store', async (_event, serverId: string, data: Record<string, any>) => {
+  return mockServerManager.setServerStore(serverId, data);
+});
+
+app.on('before-quit', async () => {
+  await mockServerManager.stopAll();
+});
+

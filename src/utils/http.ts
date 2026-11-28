@@ -73,6 +73,8 @@ export function getMethodColor(method: HttpMethod): {
       return { text: 'text-teal-400', bg: 'bg-teal-500/10', border: 'border-teal-500/30' };
     case 'HEAD':
       return { text: 'text-cyan-400', bg: 'bg-cyan-500/10', border: 'border-cyan-500/30' };
+    case 'ALL':
+      return { text: 'text-purple-400', bg: 'bg-purple-500/10', border: 'border-purple-500/30' };
     case 'TRACE':
     case 'CONNECT':
     default:

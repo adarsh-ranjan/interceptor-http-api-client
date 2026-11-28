@@ -1,6 +1,6 @@
 # Interceptor ⚡
 
-A modern, lightning-fast, cross-platform desktop API client (Postman alternative) built with **Electron**, **React 19**, **TypeScript**, and **Tailwind CSS**.
+A modern, lightning-fast, cross-platform desktop API client and mock server platform built with **Electron**, **React 19**, **TypeScript**, and **Tailwind CSS**.
 
 [![Roadmap](https://img.shields.io/badge/Roadmap-Phase%201%20to%206%20Complete-emerald)](./ROADMAP.md)
 
@@ -8,6 +8,8 @@ A modern, lightning-fast, cross-platform desktop API client (Postman alternative
 
 ## 📖 Table of Contents
 - [✨ Core Capabilities](#-core-capabilities)
+  - [⚡ Mock & Dynamic Scripting Server](#-mock--dynamic-scripting-server)
+  - [🎨 2.0 Modern Workbench Revamp](#-20-modern-workbench-revamp)
   - [Phase 1: Core Engine & Workbench](#phase-1-core-engine--workbench)
   - [Phase 2: Collections & Postman Migration](#phase-2-collections--postman-migration)
   - [Phase 3: Environments & Dynamic Variables](#phase-3-environments--dynamic-variables)
@@ -23,6 +25,62 @@ A modern, lightning-fast, cross-platform desktop API client (Postman alternative
 ---
 
 ## ✨ Core Capabilities
+
+### ⚡ Mock & Dynamic Scripting Server (Phase 1 & Phase 2)
+- **Lightweight In-App Mock Servers**:
+  - Spin up local HTTP mock servers directly within the Interceptor desktop app without any external dependencies.
+  - Fully configurable ports (e.g. `3001`, `8080`, etc.) and optional global route prefixes.
+  - Seamless background lifecycle: Start and stop individual servers with live green pulse indicators in the sidebar and header.
+  - Built-in **CORS Preflight Support**: Automatically handles `OPTIONS` requests and returns configurable `Access-Control-*` headers.
+- **Hybrid Proxy Fallback Mode (Phase 2)**:
+  - Configure an upstream target URL (e.g. `https://api.github.com`, `http://localhost:8000`).
+  - Unmatched routes automatically forward to the real upstream backend, returning live responses while mock routes take precedence.
+  - Transparently proxies method, headers, query strings, and request payloads with custom `PROXIED` badges in traffic logs.
+- **Dual-Mode Route Handlers**:
+  - **Static Response Mode**: Return fixed HTTP status codes (`200`, `201`, `400`, `404`, `500`), custom response headers, and JSON or raw text payloads.
+    - **Dynamic Variable Interpolation**: Supports dynamic tokens (`{{$guid}}`, `{{$uuid}}`, `{{$timestamp}}`, `{{$isoTimestamp}}`, `{{$randomInt}}`), path parameters (`{{params.id}}`), query strings (`{{query.search}}`), and request headers (`{{headers.authorization}}`).
+  - **Dynamic JavaScript Scripting Mode**: Execute custom Express-like JavaScript code in a sandboxed, isolated Node.js VM context:
+    - Access incoming request data: `req.params`, `req.query`, `req.body`, `req.headers`, and `req.method`.
+    - Path parameter parsing: Automatic extraction for named URL parameters (e.g., `/api/users/:id`).
+    - Wildcard matching: Support for `*` and wildcard routes.
+    - Custom response methods: `res.status(code).json(data)`, `res.send(body)`, `res.set(header, value)`.
+    - **Stateful In-Memory Store**: A persistent `store` object (`store.get(key)`, `store.set(key, value)`) that maintains state across requests (e.g., mock databases, counters, sessions).
+    - **Rich Runtime Utilities (`utils`)**: `utils.uuid()`, `utils.isoTimestamp()`, `utils.timestamp()`, `utils.randomInt(min, max)`, and `await utils.sleep(ms)`.
+    - **VSCode-Style Code Editor (Monaco Engine)**:
+      - Embedded VSCode editor engine with dedicated dark theme (`interceptor-vscode-dark`) matching Interceptor's dark palette (`#141517` background, amber line numbers/cursor, bracket pair colorization).
+      - Code prettifier and formatter (`Prettify / Shift+Alt+F`), one-click script clipboard copy, and line/column status indicators.
+      - 100% offline bundling inside the Electron desktop application.
+    - **Rich IntelliSense & Autocompletion**:
+      - Full TypeScript ExtraLib definitions providing rich hover documentation tooltips and parameter hints for `req`, `res`, `store`, and `utils`.
+      - Instant dot autocompletion for `req.` (`params`, `query`, `body`, `headers`, `method`, `path`, `url`), `res.` (`status`, `json`, `send`, `setHeader`, `setHeaders`, `end`), and `utils.` (`uuid`, `isoTimestamp`, `timestamp`, `randomInt`, `sleep`).
+      - Built-in snippet triggers (`res-json`, `res-error`, `sleep-delay`, `store-crud`, `auth-bearer-check`).
+    - **One-Click Script Snippets**: Instant templates for Stateful CRUD Store, Query Search & Filter, Bearer Token Auth, Latency Delays, Chaos Fault Injection (25% 500 error), and Webhook Receivers.
+- **In-Memory State Store Inspector (Phase 2)**:
+  - Dedicated **State Store** tab in the workbench with live JSON visualization of the server's runtime memory.
+  - **Refresh Store**: Pulls the latest live state from the running server process.
+  - **Seed / Edit JSON**: Seed initial mock databases or test records directly into the running server.
+  - **Clear Store**: One-click reset of all in-memory keys and records.
+- **Real-Time Traffic Log Inspector & Client Replay (Phase 2)**:
+  - Live inspection stream of all incoming requests received by active mock servers.
+  - Displays timestamp, HTTP method, URL path, query params, status code, latency duration, and `PROXIED` badges.
+  - **Filter by Status**: Quick filter pills for `All`, `2xx (Success)`, `4xx (Client)`, `5xx (Server)`, and `Proxied`.
+  - **Open in Client Workbench ("Replay")**: 1-click action that automatically populates a new Client Request tab with the exact method, URL, headers, and body for instant debugging.
+  - **Copy as cURL**: One-click export of the intercepted request into a runnable shell `curl` command.
+- **Custom Bruno-Inspired Server Controls**:
+  - **Custom Server Selector Dropdown**: Switch between configured mock servers with a floating Bruno portal menu displaying live status badges (running, stopped, error), port numbers, and route counts.
+  - **Custom HTTP Method Dropdown**: Select route methods (`GET`, `POST`, `PUT`, `DELETE`, `PATCH`, `ALL (*)` or custom) with method color badges and active selection checks.
+  - **Simulated Latency**: Configure per-route or global network latency delays in milliseconds to test client loading and timeout handling.
+
+---
+
+### 🎨 2.0 Modern Workbench Revamp
+- **Bruno-Inspired Clean Aesthetics**:
+  - Streamlined layout with deep dark-mode tokens (`#1a1a1a`, `#222224`, `#26292b`) and warm amber `#d99b26` highlights.
+  - Elimination of cluttered subtab rows: Body mode selection (`JSON`, `Multipart Form`, `Form URL Encoded`, `Raw Text`, `File / Binary`, `No Body`) is integrated directly as a custom dropdown on the right side of the main workbench tabs bar.
+  - Unified custom portal dropdowns (`HttpMethodDropdown`, `MockServerSelectorDropdown`, `RequestBodyModeDropdown`) with backdrop blur, keyboard navigation, and click-outside dismissal.
+  - Monaco-style custom JSON editor with line numbers, syntax highlighting, folding carets, and clean distraction-free styling.
+
+---
 
 ### Phase 1: Core Engine & Workbench
 - **CORS-Free Native Networking**: Requests execute directly within the Node.js main process, completely bypassing browser CORS restrictions and proxy blocks.
@@ -184,43 +242,58 @@ A modern, lightning-fast, cross-platform desktop API client (Postman alternative
 ```
 Interceptor/
 ├── electron/
-│   ├── main.ts         # Main process: window lifecycle, native fetch & CORS-free IPC
-│   ├── preload.ts      # Context bridge exposing safe IPC bridge
-│   └── tsconfig.json   # TypeScript compilation for Node runtime
+│   ├── main.ts                       # Main process: window lifecycle, native fetch & CORS-free IPC
+│   ├── mockServerManager.ts          # Mock server engine: Express & Node VM dynamic scripting
+│   ├── preload.ts                    # Context bridge exposing safe IPC bridge
+│   ├── types.ts                      # Isolated electron server types
+│   └── tsconfig.json                 # TypeScript compilation for Node runtime
 ├── src/
-│   ├── components/     # UI Components
+│   ├── components/                   # UI Components
 │   │   ├── AuthEditor.tsx            # Bearer, Basic, API Key editors
 │   │   ├── BodyEditor.tsx            # JSON, form-data, urlencoded, binary editors
 │   │   ├── CodeSnippetModal.tsx      # Multi-language code generator
 │   │   ├── CollectionRunnerModal.tsx # Newman-style batch test runner
 │   │   ├── CollectionsView.tsx       # Folder tree & collection manager
+│   │   ├── DynamicScriptEditor.tsx   # VSCode Monaco code editor with IntelliSense for mock scripts
 │   │   ├── EnvironmentModal.tsx      # Environment & variable dialog
 │   │   ├── EnvironmentSelector.tsx   # Header environment switcher
+│   │   ├── HttpMethodDropdown.tsx    # Bruno-style custom HTTP method selector with colors
+│   │   ├── JsonBodyEditor.tsx        # Monaco-style JSON code editor with line numbers & fold carets
 │   │   ├── KeyValueEditor.tsx        # Query params & headers editor
-│   │   ├── RequestBar.tsx            # Method selector & URL bar
+│   │   ├── MockServerSelectorDropdown.tsx # Custom mock server switcher with live status dots
+│   │   ├── MockServerWorkbench.tsx   # Mock server manager, route editor & traffic logs
+│   │   ├── RequestBar.tsx            # Integrated URL bar with custom method dropdown
+│   │   ├── RequestBodyModeDropdown.tsx # Custom body mode switcher (JSON, Form, Raw, Binary, None)
 │   │   ├── RequestTabs.tsx           # Multi-tab bar (HTTP & WebSocket)
 │   │   ├── ResponseViewer.tsx        # Pretty JSON, raw, headers & test results
 │   │   ├── SaveRequestModal.tsx      # Save request to collection modal
-│   │   ├── Sidebar.tsx               # Collapsible collections & history panel
+│   │   ├── Sidebar.tsx               # Dual-view navigation (Client Requests vs Mock Servers)
 │   │   ├── Toast.tsx                 # Non-intrusive action confirmation toasts
 │   │   ├── VariableHoverTooltip.tsx  # Interactive environment variable inspector tooltip
 │   │   ├── VariableInput.tsx         # Reusable input with syntax pill highlights & variable hover
 │   │   └── WebSocketWorkbench.tsx    # WSS client & live stream
-│   ├── types/          # TypeScript interfaces (requests, responses, collections, envs)
-│   ├── utils/          # Core utilities
+│   ├── types/                        # TypeScript interfaces
+│   │   ├── index.ts                  # Client requests, collections, auth, environments
+│   │   └── server.ts                 # Mock server, mock routes, log entries
+│   ├── utils/                        # Core utilities
 │   │   ├── auth.ts                   # Auth resolution and header injection
 │   │   ├── codegen.ts                # cURL, JS, Python, Go, Dart snippet generator
 │   │   ├── curlParser.ts             # cURL tokenizer and auto-import parser
-│   │   ├── http.ts                   # URL parsing, query sync, byte/duration formatters
+│   │   ├── http.ts                   # URL parsing, query sync, byte/duration formatters, method colors
+│   │   ├── mockServerDefaults.ts     # Default starter mock servers and persistence
 │   │   ├── postman.ts                # Postman v2.1 import & export serializer
 │   │   ├── testRunner.ts             # Sandboxed JavaScript test assertions engine
 │   │   └── variables.ts              # {{var}} template substitution & dynamic tokens
-│   ├── App.tsx         # Central state orchestration & keyboard shortcuts
-│   ├── index.css       # Tailwind CSS v4 styling & dark theme tokens
-│   └── main.tsx        # React root entrypoint
-├── ROADMAP.md          # Phased roadmap & architectural decisions
+│   ├── App.tsx                       # Central state orchestration & keyboard shortcuts
+│   ├── index.css                     # Tailwind CSS v4 styling & dark theme tokens
+│   └── main.tsx                      # React root entrypoint
+├── test/                             # Automated test suites
+│   ├── curlParser.test.ts            # cURL parsing & auto-detection test scenarios
+│   ├── mockServer.test.ts            # Mock & Dynamic Server engine test suite
+│   └── variables.test.ts             # Environment variable resolution & assertion test suite
+├── ROADMAP.md                        # Phased roadmap & architectural decisions
 ├── package.json
-└── vite.config.mts     # Vite configuration with @tailwindcss/vite
+└── vite.config.mts                   # Vite configuration with @tailwindcss/vite
 ```
 
 ---

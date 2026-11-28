@@ -18,6 +18,9 @@ interface SidebarProps {
   activeEnvId?: string | null;
   activeItemId?: string | null;
   width?: number;
+  onOpenMockServers?: () => void;
+  activeSection?: 'requests' | 'mock-servers';
+  runningMockServerCount?: number;
 }
 
 const PRESETS: { name: string; request: HttpRequest }[] = [
@@ -84,6 +87,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   activeEnvId,
   activeItemId,
   width = 260,
+  onOpenMockServers,
+  activeSection = 'requests',
+  runningMockServerCount = 0,
 }) => {
   const [showHistory, setShowHistory] = useState(false);
 
@@ -180,12 +186,32 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
           <Plus className="w-3.5 h-3.5 opacity-60 group-hover:opacity-100" />
         </div>
-        <div className="flex items-center justify-between px-3 py-2 text-xs hover:text-[#cccccc] hover:bg-[#222224] cursor-pointer transition-colors group border-t border-[#333333]/50">
+        <div
+          onClick={onOpenMockServers}
+          className={`flex items-center justify-between px-3 py-2 text-xs cursor-pointer transition-colors group border-t border-[#333333]/50 ${
+            activeSection === 'mock-servers'
+              ? 'bg-[#26292b] text-white font-medium'
+              : 'hover:text-[#cccccc] hover:bg-[#222224]'
+          }`}
+        >
           <div className="flex items-center gap-2">
-            <Server className="w-3.5 h-3.5 text-[#777777] group-hover:text-[#cccccc]" />
+            <Server className={`w-3.5 h-3.5 ${activeSection === 'mock-servers' ? 'text-[#d99b26]' : 'text-[#777777] group-hover:text-[#cccccc]'}`} />
             <span>Mock Servers</span>
+            {runningMockServerCount > 0 && (
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse ml-0.5" title={`${runningMockServerCount} server(s) running`} />
+            )}
           </div>
-          <Plus className="w-3.5 h-3.5 opacity-60 group-hover:opacity-100" />
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenMockServers?.();
+            }}
+            className="p-0.5 text-[#777777] hover:text-[#d99b26] transition-colors"
+            title="Open Mock Server Workbench"
+          >
+            <Plus className="w-3.5 h-3.5 opacity-60 group-hover:opacity-100" />
+          </button>
         </div>
         <div
           onClick={() => setShowHistory(!showHistory)}

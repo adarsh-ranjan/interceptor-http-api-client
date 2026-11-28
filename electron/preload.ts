@@ -67,6 +67,44 @@ const api = {
   }): Promise<boolean> => {
     return ipcRenderer.invoke('dialog:saveFile', options);
   },
+  mockServer: {
+    startServer: (server: any): Promise<{ success: boolean; error?: string }> => {
+      return ipcRenderer.invoke('mock-server:start', server);
+    },
+    stopServer: (serverId: string): Promise<{ success: boolean; error?: string }> => {
+      return ipcRenderer.invoke('mock-server:stop', serverId);
+    },
+    stopAllServers: (): Promise<{ success: boolean }> => {
+      return ipcRenderer.invoke('mock-server:stop-all');
+    },
+    getStore: (serverId: string): Promise<Record<string, any>> => {
+      return ipcRenderer.invoke('mock-server:get-store', serverId);
+    },
+    clearStore: (serverId: string): Promise<boolean> => {
+      return ipcRenderer.invoke('mock-server:clear-store', serverId);
+    },
+    setStore: (serverId: string, data: Record<string, any>): Promise<boolean> => {
+      return ipcRenderer.invoke('mock-server:set-store', serverId, data);
+    },
+    onServerLog: (callback: (log: any) => void) => {
+      const handler = (_event: any, log: any) => {
+        callback(log);
+      };
+      ipcRenderer.on('mock-server:request-log', handler);
+      return () => {
+        ipcRenderer.removeListener('mock-server:request-log', handler);
+      };
+    },
+    onServerStatusChange: (callback: (data: { serverId: string; status: any; error?: string }) => void) => {
+      const handler = (_event: any, data: any) => {
+        callback(data);
+      };
+      ipcRenderer.on('mock-server:status-change', handler);
+      return () => {
+        ipcRenderer.removeListener('mock-server:status-change', handler);
+      };
+    },
+  },
 };
 
 contextBridge.exposeInMainWorld('interceptor', api);
