@@ -44,7 +44,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   return (
     <aside
       style={{ width: `${width}px` }}
-      className="shrink-0 bg-[#1a1a1a] border-r border-[#333333] flex flex-col h-full text-xs select-none"
+      className="shrink-0 bg-[#1a1a1a] flex flex-col h-full text-xs select-none"
     >
       <div className="flex-1 overflow-hidden flex flex-col bg-[#1a1a1a]">
         {showHistory ? (
@@ -132,19 +132,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
         <div
           onClick={onOpenMockServers}
-          className={`flex items-center justify-between px-3 py-2 text-xs cursor-pointer transition-colors group border-t border-[#333333]/50 ${
-            activeSection === 'mock-servers'
+          className={`flex items-center justify-between px-3 py-2 text-xs cursor-pointer transition-colors group border-t border-[#333333]/50 ${activeSection === 'mock-servers'
               ? 'bg-[#26292b] text-white font-medium'
               : 'hover:text-[#cccccc] hover:bg-[#222224]'
-          }`}
+            }`}
         >
           <div className="flex items-center gap-2">
             <Server
-              className={`w-3.5 h-3.5 ${
-                activeSection === 'mock-servers'
+              className={`w-3.5 h-3.5 ${activeSection === 'mock-servers'
                   ? 'text-[#d99b26]'
                   : 'text-[#777777] group-hover:text-[#cccccc]'
-              }`}
+                }`}
             />
             <span>Mock Servers</span>
             {runningMockServerCount > 0 && (

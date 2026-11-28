@@ -1,7 +1,8 @@
 import React, { useRef, useState } from 'react';
 import { RequestProtocol, TabItem } from '../types';
 import { getMethodColor } from '../utils/http';
-import { ChevronDown, Globe, Plus, Radio, X } from 'lucide-react';
+import { useTabScroll } from '../hooks/useTabScroll';
+import { ChevronDown, ChevronLeft, ChevronRight, Globe, Plus, Radio, X } from 'lucide-react';
 import { PortalMenu } from './PortalMenu';
 
 interface RequestTabsProps {
@@ -24,6 +25,16 @@ export const RequestTabs: React.FC<RequestTabsProps> = ({
   const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
 
+  const {
+    scrollContainerRef,
+    canScrollLeft,
+    canScrollRight,
+    isOverflowing,
+    updateScrollState,
+    scrollTabs,
+    handleWheel,
+  } = useTabScroll({ activeTabId, itemCount: tabs.length });
+
   const toggleMenu = () => {
     if (isMenuOpen) {
       setIsMenuOpen(false);
@@ -45,8 +56,34 @@ export const RequestTabs: React.FC<RequestTabsProps> = ({
   };
 
   return (
-    <div className="flex items-end bg-[#1a1a1a] border-b border-[#333333] h-9 px-4 overflow-x-auto select-none no-scrollbar">
-      <div className="flex items-end h-full gap-1">
+    <div
+      className={`flex items-end bg-[#1a1a1a] border-b border-[#333333] h-9 select-none shrink-0 ${
+        isOverflowing ? 'px-1.5 gap-1' : 'px-4'
+      }`}
+    >
+      {isOverflowing && (
+        <button
+          type="button"
+          onClick={() => scrollTabs('left')}
+          disabled={!canScrollLeft}
+          className={`w-6 h-7 mb-1 flex items-center justify-center rounded shrink-0 transition-colors ${
+            canScrollLeft
+              ? 'text-[#999999] hover:text-white hover:bg-[#26292b] cursor-pointer'
+              : 'text-[#555555] opacity-40 cursor-not-allowed'
+          }`}
+          title="Scroll tabs left"
+          aria-label="Scroll tabs left"
+        >
+          <ChevronLeft className="w-3.5 h-3.5" />
+        </button>
+      )}
+
+      <div
+        ref={scrollContainerRef}
+        onScroll={updateScrollState}
+        onWheel={handleWheel}
+        className="flex items-end h-9 -mb-px gap-1 overflow-x-auto no-scrollbar min-w-0"
+      >
         {tabs.map((tab) => {
           const isActive = tab.id === activeTabId;
           const isWs = tab.protocol === 'websocket';
@@ -55,11 +92,12 @@ export const RequestTabs: React.FC<RequestTabsProps> = ({
           return (
             <div
               key={tab.id}
+              data-tab-id={tab.id}
               onClick={() => onSelectTab(tab.id)}
               className={`group relative flex items-center gap-2 px-3 py-1 text-xs cursor-pointer transition-all max-w-[210px] shrink-0 ${
                 isActive
-                  ? 'bg-[#1a1a1a] border-t border-l border-r border-[#333333] border-b border-[#1a1a1a] -mb-px text-[#ffffff] font-medium z-10 shadow-xs h-[32px] rounded-t-md'
-                  : 'bg-[#26292b] hover:bg-[#2f3235] text-[#999999] hover:text-[#cccccc] h-[28px] mb-1 rounded-md'
+                  ? 'bg-[#1a1a1a] border-t border-l border-r border-[#333333] border-b border-[#1a1a1a] text-[#ffffff] font-medium z-10 shadow-xs h-[33px] rounded-t-md'
+                  : 'bg-[#26292b] hover:bg-[#2f3235] text-[#999999] hover:text-[#cccccc] h-[28px] mb-[5px] rounded-md'
               }`}
             >
               {isWs ? (
@@ -129,6 +167,23 @@ export const RequestTabs: React.FC<RequestTabsProps> = ({
           <ChevronDown className="w-3 h-3" />
         </button>
       </div>
+
+      {isOverflowing && (
+        <button
+          type="button"
+          onClick={() => scrollTabs('right')}
+          disabled={!canScrollRight}
+          className={`w-6 h-7 mb-1 ml-auto flex items-center justify-center rounded shrink-0 transition-colors ${
+            canScrollRight
+              ? 'text-[#999999] hover:text-white hover:bg-[#26292b] cursor-pointer'
+              : 'text-[#555555] opacity-40 cursor-not-allowed'
+          }`}
+          title="Scroll tabs right"
+          aria-label="Scroll tabs right"
+        >
+          <ChevronRight className="w-3.5 h-3.5" />
+        </button>
+      )}
 
       <PortalMenu
         isOpen={isMenuOpen}

@@ -179,14 +179,12 @@ export const App: React.FC = () => {
       />
 
       <div
-        className={`flex-1 flex overflow-hidden ${
-          isDraggingSidebar || isDraggingEditor ? 'select-none pointer-events-auto' : ''
-        }`}
+        className={`flex-1 flex overflow-hidden border-t border-[#333333] ${isDraggingSidebar || isDraggingEditor ? 'select-none pointer-events-auto' : ''
+          }`}
       >
         <div
-          className={`shrink-0 overflow-hidden ${
-            isDraggingSidebar ? '' : 'transition-all duration-300 ease-in-out'
-          }`}
+          className={`shrink-0 overflow-hidden ${isDraggingSidebar ? '' : 'transition-all duration-300 ease-in-out'
+            }`}
           style={{
             width: isSidebarCollapsed ? 0 : `${sidebarWidth}px`,
             opacity: isSidebarCollapsed ? 0 : 1,
@@ -225,13 +223,11 @@ export const App: React.FC = () => {
 
         <div
           onMouseDown={!isSidebarCollapsed ? handleStartSidebarResize : undefined}
-          className={`z-20 select-none group flex items-center justify-center shrink-0 border-r border-[#333333] ${
-            isDraggingSidebar ? '' : 'transition-all duration-300 ease-in-out'
-          } ${
-            isSidebarCollapsed
+          className={`z-20 select-none group flex items-center justify-center shrink-0 border-r border-[#333333] ${isDraggingSidebar ? '' : 'transition-all duration-300 ease-in-out'
+            } ${isSidebarCollapsed
               ? 'w-0 opacity-0 pointer-events-none border-transparent'
               : 'w-1.5 -ml-1 cursor-col-resize hover:bg-[#d99b26] active:bg-[#d99b26]'
-          } ${isDraggingSidebar ? 'bg-[#d99b26]' : ''}`}
+            } ${isDraggingSidebar ? 'bg-[#d99b26]' : ''}`}
           title="Drag to resize sidebar (Double click to reset to 260px)"
           onDoubleClick={() => setSidebarWidth(DEFAULT_SIDEBAR_WIDTH)}
         >
