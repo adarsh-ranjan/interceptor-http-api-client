@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { KeyValuePair, Environment } from '../types';
 import { Trash2, HelpCircle } from 'lucide-react';
 import { VariableInput } from './VariableInput';
+import { Button } from './ui/button';
+import { Textarea } from './ui/textarea';
 
 interface KeyValueEditorProps {
   items: KeyValuePair[];
@@ -50,7 +52,6 @@ export const KeyValueEditor: React.FC<KeyValueEditorProps> = ({
     onChange(items.map((i) => ({ ...i, enabled: checked })));
   };
 
-  // When typing into the new row placeholder
   const handleAddNewRow = (field: 'key' | 'value' | 'description', val: string) => {
     if (!val.trim() && field === 'key') return;
     const newItem: KeyValuePair = {
@@ -98,40 +99,43 @@ export const KeyValueEditor: React.FC<KeyValueEditorProps> = ({
     <div className="flex flex-col h-full overflow-y-auto px-4 py-3 select-none text-xs">
       {/* Section Title */}
       <div className="mb-2 flex items-center justify-between">
-        <span className="font-semibold text-xs text-[#888888]">{title}</span>
+        <span className="font-semibold text-xs text-muted-foreground">{title}</span>
       </div>
 
       {isBulkEdit ? (
         <div className="flex flex-col gap-2">
-          <textarea
+          <Textarea
             value={bulkText}
             onChange={(e) => setBulkText(e.target.value)}
             placeholder="key:value"
-            className="w-full h-40 bg-[#1a1a1a] border border-[#333333] rounded p-2.5 font-mono text-xs text-[#cccccc] focus:outline-none focus:border-[#444444] resize-none"
+            className="w-full h-40 bg-card border-border font-mono text-xs text-foreground resize-none"
           />
           <div className="flex items-center justify-end gap-2">
-            <button
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() => setIsBulkEdit(false)}
-              className="px-2.5 py-1 text-xs rounded text-[#888888] hover:text-[#cccccc] transition-colors cursor-pointer"
+              className="text-muted-foreground hover:text-foreground text-xs"
             >
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="amber"
+              size="sm"
               onClick={handleSaveBulkEdit}
-              className="px-3 py-1 text-xs rounded bg-[#d99b26] hover:bg-[#c2871a] text-white font-medium transition-colors cursor-pointer"
+              className="text-xs"
             >
               Apply
-            </button>
+            </Button>
           </div>
         </div>
       ) : (
         <>
-          {/* Bruno EditableTable */}
-          <div className="border border-[#333333] rounded overflow-clip bg-[#1a1a1a]">
+          <div className="border border-border rounded-md overflow-clip bg-card">
             <table className="w-full border-collapse table-fixed text-xs">
               <thead>
-                <tr className="bg-[#1a1a1a] text-[#888888] select-none h-8">
-                  <td className="w-8 text-center border-b border-r border-[#333333] p-0">
+                <tr className="bg-muted/50 text-muted-foreground select-none h-8">
+                  <td className="w-8 text-center border-b border-r border-border p-0">
                     <input
                       type="checkbox"
                       checked={allChecked}
@@ -139,36 +143,36 @@ export const KeyValueEditor: React.FC<KeyValueEditorProps> = ({
                         if (el) el.indeterminate = !allChecked && someChecked;
                       }}
                       onChange={handleToggleAll}
-                      className="cursor-pointer accent-[#d99b26]"
+                      className="cursor-pointer accent-amber-500"
                     />
                   </td>
-                  <td className="w-[32%] px-2.5 py-1.5 border-b border-r border-[#333333] font-normal text-[#888888]">
+                  <td className="w-[32%] px-2.5 py-1.5 border-b border-r border-border font-normal text-muted-foreground">
                     {keyPlaceholder}
                   </td>
-                  <td className="w-[35%] px-2.5 py-1.5 border-b border-r border-[#333333] font-normal text-[#888888]">
+                  <td className="w-[35%] px-2.5 py-1.5 border-b border-r border-border font-normal text-muted-foreground">
                     {valuePlaceholder}
                   </td>
-                  <td className="px-2.5 py-1.5 border-b border-r border-[#333333] font-normal text-[#888888]">
+                  <td className="px-2.5 py-1.5 border-b border-r border-border font-normal text-muted-foreground">
                     {descriptionPlaceholder}
                   </td>
-                  <td className="w-8 border-b border-[#333333] p-0"></td>
+                  <td className="w-8 border-b border-border p-0"></td>
                 </tr>
               </thead>
               <tbody>
                 {items.map((item) => (
                   <tr
                     key={item.id}
-                    className="h-8 hover:bg-[#222224] transition-colors group"
+                    className="h-8 hover:bg-muted/40 transition-colors group"
                   >
-                    <td className="w-8 text-center border-b border-r border-[#333333] p-0">
+                    <td className="w-8 text-center border-b border-r border-border p-0">
                       <input
                         type="checkbox"
                         checked={item.enabled}
                         onChange={() => handleToggle(item.id)}
-                        className="cursor-pointer accent-[#d99b26]"
+                        className="cursor-pointer accent-amber-500"
                       />
                     </td>
-                    <td className="border-b border-r border-[#333333] p-0">
+                    <td className="border-b border-r border-border p-0">
                       <VariableInput
                         value={item.key}
                         onChange={(val) => handleUpdate(item.id, 'key', val)}
@@ -179,7 +183,7 @@ export const KeyValueEditor: React.FC<KeyValueEditorProps> = ({
                         wrapperClassName="border-0 bg-transparent rounded-none focus-within:border-0"
                       />
                     </td>
-                    <td className="border-b border-r border-[#333333] p-0">
+                    <td className="border-b border-r border-border p-0">
                       <VariableInput
                         value={item.value}
                         onChange={(val) => handleUpdate(item.id, 'value', val)}
@@ -190,33 +194,35 @@ export const KeyValueEditor: React.FC<KeyValueEditorProps> = ({
                         wrapperClassName="border-0 bg-transparent rounded-none focus-within:border-0"
                       />
                     </td>
-                    <td className="border-b border-r border-[#333333] p-0">
+                    <td className="border-b border-r border-border p-0">
                       <input
                         type="text"
                         value={item.description || ''}
                         onChange={(e) => handleUpdate(item.id, 'description', e.target.value)}
                         placeholder="Description"
-                        className="w-full bg-transparent px-2.5 py-1 text-xs text-[#cccccc] placeholder:text-[#666666] outline-none"
+                        className="w-full bg-transparent px-2.5 py-1 text-xs text-foreground placeholder:text-muted-foreground/50 outline-none"
                       />
                     </td>
-                    <td className="w-8 text-center border-b border-[#333333] p-0">
-                      <button
+                    <td className="w-8 text-center border-b border-border p-0">
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
                         onClick={() => handleDelete(item.id)}
-                        className="p-1 text-[#666666] hover:text-rose-400 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                        className="p-1 h-6 w-6 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
                         title="Delete row"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                      </Button>
                     </td>
                   </tr>
                 ))}
 
-                {/* Always-visible Empty Row for quick inline addition (Bruno style) */}
-                <tr className="h-8 hover:bg-[#222224] transition-colors">
-                  <td className="w-8 text-center border-b border-r border-[#333333] p-0 opacity-40">
-                    <input type="checkbox" disabled className="accent-[#d99b26]" />
+                {/* Inline Add Row */}
+                <tr className="h-8 hover:bg-muted/30 transition-colors">
+                  <td className="w-8 text-center border-b border-r border-border p-0 opacity-40">
+                    <input type="checkbox" disabled className="accent-amber-500" />
                   </td>
-                  <td className="border-b border-r border-[#333333] p-0">
+                  <td className="border-b border-r border-border p-0">
                     <input
                       type="text"
                       placeholder="Name"
@@ -232,10 +238,10 @@ export const KeyValueEditor: React.FC<KeyValueEditorProps> = ({
                           e.currentTarget.value = '';
                         }
                       }}
-                      className="w-full bg-transparent px-2.5 py-1 text-xs text-[#cccccc] placeholder:text-[#555555] outline-none font-mono"
+                      className="w-full bg-transparent px-2.5 py-1 text-xs text-foreground placeholder:text-muted-foreground/40 outline-none font-mono"
                     />
                   </td>
-                  <td className="border-b border-r border-[#333333] p-0">
+                  <td className="border-b border-r border-border p-0">
                     <input
                       type="text"
                       placeholder="Value"
@@ -251,10 +257,10 @@ export const KeyValueEditor: React.FC<KeyValueEditorProps> = ({
                           e.currentTarget.value = '';
                         }
                       }}
-                      className="w-full bg-transparent px-2.5 py-1 text-xs text-[#cccccc] placeholder:text-[#555555] outline-none font-mono"
+                      className="w-full bg-transparent px-2.5 py-1 text-xs text-foreground placeholder:text-muted-foreground/40 outline-none font-mono"
                     />
                   </td>
-                  <td className="border-b border-r border-[#333333] p-0">
+                  <td className="border-b border-r border-border p-0">
                     <input
                       type="text"
                       placeholder="Description"
@@ -270,31 +276,33 @@ export const KeyValueEditor: React.FC<KeyValueEditorProps> = ({
                           e.currentTarget.value = '';
                         }
                       }}
-                      className="w-full bg-transparent px-2.5 py-1 text-xs text-[#cccccc] placeholder:text-[#555555] outline-none"
+                      className="w-full bg-transparent px-2.5 py-1 text-xs text-foreground placeholder:text-muted-foreground/40 outline-none"
                     />
                   </td>
-                  <td className="w-8 border-b border-[#333333] p-0"></td>
+                  <td className="w-8 border-b border-border p-0"></td>
                 </tr>
               </tbody>
             </table>
           </div>
 
-          {/* Bulk Edit Button (matches Image 4) */}
+          {/* Bulk Edit Button */}
           <div className="flex justify-end mt-2">
-            <button
+            <Button
+              variant="link"
+              size="sm"
               onClick={handleStartBulkEdit}
-              className="text-xs text-[#3b82f6] hover:underline cursor-pointer select-none"
+              className="text-xs text-blue-400 hover:text-blue-300 h-auto p-0"
             >
               Bulk Edit
-            </button>
+            </Button>
           </div>
 
-          {/* Path Parameters Section (matches Image 4) */}
+          {/* Path Parameters Section */}
           {showPathParams && (
             <div className="mt-4">
               <div className="flex items-center gap-1.5 mb-2">
-                <span className="font-semibold text-xs text-[#888888]">Path</span>
-                <HelpCircle className="w-3.5 h-3.5 text-[#666666]" title="Path variables are automatically extracted from URL patterns like :param" />
+                <span className="font-semibold text-xs text-muted-foreground">Path</span>
+                <HelpCircle className="w-3.5 h-3.5 text-muted-foreground/60" title="Path variables are automatically extracted from URL patterns like :param" />
               </div>
             </div>
           )}
@@ -303,4 +311,3 @@ export const KeyValueEditor: React.FC<KeyValueEditorProps> = ({
     </div>
   );
 };
-

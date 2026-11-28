@@ -9,17 +9,27 @@ import {
 } from '../types';
 import { interpolateRequest } from '../utils/variables';
 import { applyAuthToHeadersAndParams } from '../utils/auth';
-import { syncUrlWithParams, keyValuesToRecord, formatDuration, getMethodBadgeClass } from '../utils/http';
+import { syncUrlWithParams, keyValuesToRecord, formatDuration } from '../utils/http';
 import { runTestScript } from '../utils/testRunner';
+import { CollectionRunResultRow } from './runner/CollectionRunResultRow';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from './ui/dialog';
+import { Button } from './ui/button';
+import { Input } from './ui/input';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from './ui/select';
+import { ScrollArea } from './ui/scroll-area';
 import {
   Play,
   CheckCircle2,
   XCircle,
   Clock,
-  Layers,
   RotateCcw,
-  X,
-  AlertTriangle,
+  Sparkles,
 } from 'lucide-react';
 
 interface CollectionRunnerModalProps {
@@ -40,12 +50,16 @@ export const CollectionRunnerModal: React.FC<CollectionRunnerModalProps> = ({
   const [selectedEnvId, setSelectedEnvId] = useState<string | null>(activeEnvId);
   const [delayMs, setDelayMs] = useState(0);
   const [isRunning, setIsRunning] = useState(false);
-  const [currentProgress, setCurrentProgress] = useState<{ current: number; total: number; requestName: string } | null>(null);
+  const [currentProgress, setCurrentProgress] = useState<{
+    current: number;
+    total: number;
+    requestName: string;
+  } | null>(null);
   const [runReport, setRunReport] = useState<CollectionRunReport | null>(null);
 
-  if (!isOpen || !collection) return null;
+  if (!collection) return null;
 
-  // Recursively collect all requests in collection
+  // Flatten all requests in collection
   const flattenRequests = (items: CollectionItem[]): { name: string; request: HttpRequest }[] => {
     let result: { name: string; request: HttpRequest }[] = [];
     for (const item of items) {
@@ -83,10 +97,7 @@ export const CollectionRunnerModal: React.FC<CollectionRunnerModalProps> = ({
         await new Promise((resolve) => setTimeout(resolve, delayMs));
       }
 
-      // 1. Resolve variables
       const interpolatedReq = interpolateRequest(request, activeEnv);
-
-      // 2. Apply auth
       const { headers: effectiveHeadersList, params: effectiveParamsList } =
         applyAuthToHeadersAndParams(
           interpolatedReq.auth,
@@ -98,198 +109,163 @@ export const CollectionRunnerModal: React.FC<CollectionRunnerModalProps> = ({
       const reqHeaders = keyValuesToRecord(effectiveHeadersList);
 
       try {
-        let resData: any;
-        if (window.interceptor?.sendRequest) {
-          resData = await window.interceptor.sendRequest({
-            id: interpolatedReq.id,
-            method: interpolatedReq.method,
-            url: finalUrl,
-            headers: reqHeaders,
-            bodyType: interpolatedReq.bodyType,
-            body:
-              interpolatedReq.bodyType === 'json' || interpolatedReq.bodyType === 'text'
-                ? interpolatedReq.bodyContent
-                : undefined,
-            formData: interpolatedReq.formData,
-            urlEncoded: interpolatedReq.urlEncoded,
-            binaryFilePath: interpolatedReq.binaryFilePath,
+        const reqStart = performance.now();
+        const response = await window.interceptor.sendRequest({
+          url: finalUrl,
+          method: interpolatedReq.method,
+          headers: reqHeaders,
+          body: interpolatedReq.body?.raw || '',
+          timeout: 30000,
+        });
+        const reqTime = performance.now() - reqStart;
+
+        let testResults: any[] = [];
+        let reqPassed = response.status >= 200 && response.status < 400;
+
+        if (interpolatedReq.testScript && interpolatedReq.testScript.trim()) {
+          const testOutcome = runTestScript(interpolatedReq.testScript, {
+            status: response.status,
+            statusText: response.statusText,
+            headers: response.headers,
+            data: response.data,
+            timeMs: reqTime,
+            sizeBytes: response.sizeBytes || 0,
+            rawBody: typeof response.data === 'string' ? response.data : JSON.stringify(response.data),
+            isJson: typeof response.data === 'object',
           });
-        } else {
-          // Browser fetch fallback
-          const t0 = performance.now();
-          const init: RequestInit = {
-            method: interpolatedReq.method,
-            headers: reqHeaders,
-          };
-          if (
-            ['POST', 'PUT', 'PATCH', 'DELETE'].includes(interpolatedReq.method) &&
-            (interpolatedReq.bodyType === 'json' || interpolatedReq.bodyType === 'text')
-          ) {
-            init.body = interpolatedReq.bodyContent;
-          }
-          const res = await fetch(finalUrl, init);
-          const t1 = performance.now();
-          const raw = await res.text();
-          let data = raw;
-          try {
-            data = JSON.parse(raw);
-          } catch {
-            // not json
-          }
-          resData = {
-            status: res.status,
-            statusText: res.statusText,
-            headers: {},
-            data,
-            rawBody: raw,
-            contentType: res.headers.get('content-type') || '',
-            isJson: true,
-            timeMs: Math.round(t1 - t0),
-            sizeBytes: new Blob([raw]).size,
-          };
+          testResults = testOutcome.results;
+          reqPassed = testOutcome.allPassed;
         }
 
-        // Run assertions
-        const testResults = interpolatedReq.testScript
-          ? runTestScript(interpolatedReq.testScript, resData, undefined, activeEnv, environments)
-          : [];
-
-        const testPassed = testResults.filter((t) => t.passed).length;
-        const testFailed = testResults.filter((t) => !t.passed).length;
-        passedCount += testPassed;
-        failedCount += testFailed;
+        if (reqPassed) passedCount++;
+        else failedCount++;
 
         itemResults.push({
-          id: Math.random().toString(36).substring(2, 9),
+          id: request.id,
           name,
-          method: interpolatedReq.method,
-          url: finalUrl,
-          status: resData.status,
-          statusText: resData.statusText,
-          timeMs: resData.timeMs,
+          request: interpolatedReq,
+          statusCode: response.status,
+          timeMs: reqTime,
+          sizeBytes: response.sizeBytes || 0,
+          passed: reqPassed,
           testResults,
         });
       } catch (err: any) {
-        failedCount += 1;
+        failedCount++;
         itemResults.push({
-          id: Math.random().toString(36).substring(2, 9),
+          id: request.id,
           name,
-          method: interpolatedReq.method,
-          url: finalUrl,
-          status: 0,
-          statusText: 'Error',
+          request: interpolatedReq,
+          statusCode: 0,
           timeMs: 0,
-          testResults: [],
-          error: err.message,
+          sizeBytes: 0,
+          passed: false,
+          testResults: [{ name: 'Request Error', passed: false, error: err.message || 'Network failure' }],
+          error: err.message || 'Execution error',
         });
       }
     }
 
-    const endTime = performance.now();
+    const totalDuration = performance.now() - startTime;
     setIsRunning(false);
     setCurrentProgress(null);
-
     setRunReport({
       collectionId: collection.id,
       collectionName: collection.name,
-      startTime,
-      endTime,
       totalRequests: allRequests.length,
-      passedCount,
-      failedCount,
+      passedRequests: passedCount,
+      failedRequests: failedCount,
+      totalDurationMs: totalDuration,
       results: itemResults,
+      timestamp: Date.now(),
     });
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 select-none">
-      <div className="w-full max-w-3xl h-[600px] bg-[#222224] border border-[#333333] rounded-lg shadow-2xl overflow-hidden flex flex-col text-xs">
-        {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-[#333333] bg-[#1a1a1a]">
-          <div className="flex items-center gap-2 text-[#cccccc] font-semibold text-sm">
-            <Layers className="w-4 h-4 text-[#d99b26]" />
+    <Dialog open={isOpen} onOpenChange={(open) => !open && !isRunning && onClose()}>
+      <DialogContent className="max-w-2xl h-[580px] p-0 flex flex-col gap-0 overflow-hidden">
+        <DialogHeader className="p-4 border-b border-border bg-[#141517]">
+          <DialogTitle className="flex items-center gap-2">
+            <Play className="w-4 h-4 text-primary fill-current" />
             <span>Collection Runner: {collection.name}</span>
-          </div>
-          <button
-            onClick={onClose}
-            className="text-[#888888] hover:text-white p-1 rounded hover:bg-[#26292b] transition-colors cursor-pointer"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
+          </DialogTitle>
+          <DialogDescription>
+            Execute batch API requests with sequential assertion validation.
+          </DialogDescription>
+        </DialogHeader>
 
-        {/* Configuration Bar */}
-        <div className="p-3 border-b border-[#333333] bg-[#222224] flex items-center justify-between flex-wrap gap-3">
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-1.5">
-              <label className="text-[#888888] font-medium">Environment:</label>
-              <select
-                value={selectedEnvId || ''}
-                onChange={(e) => setSelectedEnvId(e.target.value || null)}
-                disabled={isRunning}
-                className="bg-[#1a1a1a] border border-[#333333] rounded px-2.5 py-1 text-[#cccccc] focus:outline-none focus:border-[#444444] cursor-pointer"
-              >
-                <option value="">No Environment</option>
+        {/* Configuration Row */}
+        <div className="p-3 bg-[#1a1b1e] border-b border-border flex items-center justify-between gap-3 text-xs select-none">
+          <div className="flex items-center gap-2 flex-1">
+            <label className="text-muted-foreground font-medium shrink-0">Environment:</label>
+            <Select
+              value={selectedEnvId || 'none'}
+              onValueChange={(val) => setSelectedEnvId(val === 'none' ? null : val)}
+              disabled={isRunning}
+            >
+              <SelectTrigger className="w-44 h-7 text-xs bg-[#141517]">
+                <SelectValue placeholder="No Environment" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">No Environment</SelectItem>
                 {environments.map((env) => (
-                  <option key={env.id} value={env.id}>
+                  <SelectItem key={env.id} value={env.id}>
                     {env.name}
-                  </option>
+                  </SelectItem>
                 ))}
-              </select>
-            </div>
-
-            <div className="flex items-center gap-1.5">
-              <label className="text-[#888888] font-medium">Delay:</label>
-              <input
-                type="number"
-                min="0"
-                step="50"
-                value={delayMs}
-                onChange={(e) => setDelayMs(Math.max(0, parseInt(e.target.value) || 0))}
-                disabled={isRunning}
-                className="w-16 bg-[#1a1a1a] border border-[#333333] rounded px-2 py-1 text-[#cccccc] font-mono focus:outline-none focus:border-[#444444]"
-              />
-              <span className="text-[#666666] font-mono">ms</span>
-            </div>
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="flex items-center gap-2">
-            {runReport ? (
-              <button
-                onClick={handleStartRun}
-                disabled={isRunning}
-                className="flex items-center gap-1.5 px-4 py-1.5 bg-[#d99b26] hover:bg-[#c2871a] text-white rounded font-medium shadow-sm transition-colors cursor-pointer"
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-                <span>Run Again</span>
-              </button>
-            ) : (
-              <button
-                onClick={handleStartRun}
-                disabled={isRunning || allRequests.length === 0}
-                className="flex items-center gap-1.5 px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded font-medium shadow-sm transition-colors cursor-pointer"
-              >
-                <Play className="w-3.5 h-3.5 fill-current" />
-                <span>Run {allRequests.length} Requests</span>
-              </button>
-            )}
+            <label className="text-muted-foreground font-medium shrink-0">Delay (ms):</label>
+            <Input
+              type="number"
+              value={delayMs}
+              onChange={(e) => setDelayMs(Math.max(0, Number(e.target.value)))}
+              disabled={isRunning}
+              min={0}
+              className="w-20 h-7 text-xs font-mono text-center bg-[#141517]"
+            />
           </div>
+
+          <Button
+            variant="amber"
+            size="sm"
+            onClick={handleStartRun}
+            disabled={isRunning || allRequests.length === 0}
+            className="h-7 font-semibold"
+          >
+            {isRunning ? (
+              <span>Running ({currentProgress?.current}/{currentProgress?.total})...</span>
+            ) : runReport ? (
+              <>
+                <RotateCcw className="w-3.5 h-3.5 mr-1" />
+                <span>Run Again</span>
+              </>
+            ) : (
+              <>
+                <Play className="w-3.5 h-3.5 mr-1 fill-current" />
+                <span>Start Run ({allRequests.length})</span>
+              </>
+            )}
+          </Button>
         </div>
 
-        {/* Live Progress Indicator */}
+        {/* Live Progress Bar */}
         {isRunning && currentProgress && (
-          <div className="px-4 py-3 bg-[#1a1a1a] border-b border-[#333333]">
-            <div className="flex items-center justify-between mb-1.5 text-[#cccccc]">
-              <span className="font-medium">
-                Running ({currentProgress.current}/{currentProgress.total}): {currentProgress.requestName}
+          <div className="p-3 bg-[#141517] border-b border-border space-y-1.5 select-none">
+            <div className="flex items-center justify-between text-xs">
+              <span className="font-medium text-foreground truncate">
+                Running: {currentProgress.requestName}
               </span>
-              <span className="font-mono text-[#888888]">
-                {Math.round((currentProgress.current / currentProgress.total) * 100)}%
+              <span className="font-mono text-muted-foreground text-[11px]">
+                {currentProgress.current} / {currentProgress.total}
               </span>
             </div>
-            <div className="w-full bg-[#222224] h-2 rounded-full overflow-hidden border border-[#333333]">
+            <div className="w-full bg-[#26282c] h-1.5 rounded-full overflow-hidden">
               <div
-                className="bg-[#d99b26] h-full transition-all duration-200"
+                className="bg-primary h-full transition-all duration-200"
                 style={{
                   width: `${(currentProgress.current / currentProgress.total) * 100}%`,
                 }}
@@ -298,132 +274,49 @@ export const CollectionRunnerModal: React.FC<CollectionRunnerModalProps> = ({
           </div>
         )}
 
-        {/* Report / Queue View */}
-        <div className="flex-1 overflow-y-auto p-4 bg-[#1a1a1a]">
+        {/* Scorecard Summary */}
+        {runReport && (
+          <div className="grid grid-cols-4 gap-2 p-3 bg-[#141517] border-b border-border text-center select-none">
+            <div className="p-2 rounded bg-[#1a1b1e] border border-border">
+              <div className="text-[10px] text-muted-foreground uppercase font-semibold">Total</div>
+              <div className="text-base font-bold text-foreground font-mono">{runReport.totalRequests}</div>
+            </div>
+            <div className="p-2 rounded bg-emerald-950/20 border border-emerald-800/30">
+              <div className="text-[10px] text-emerald-400 uppercase font-semibold">Passed</div>
+              <div className="text-base font-bold text-emerald-400 font-mono">{runReport.passedRequests}</div>
+            </div>
+            <div className="p-2 rounded bg-rose-950/20 border border-rose-800/30">
+              <div className="text-[10px] text-rose-400 uppercase font-semibold">Failed</div>
+              <div className="text-base font-bold text-rose-400 font-mono">{runReport.failedRequests}</div>
+            </div>
+            <div className="p-2 rounded bg-[#1a1b1e] border border-border">
+              <div className="text-[10px] text-muted-foreground uppercase font-semibold">Duration</div>
+              <div className="text-base font-bold text-foreground font-mono">{formatDuration(runReport.totalDurationMs)}</div>
+            </div>
+          </div>
+        )}
+
+        {/* Results List */}
+        <ScrollArea className="flex-1 p-3 bg-[#141517]">
           {runReport ? (
-            <div className="space-y-4">
-              {/* Summary Stats Cards */}
-              <div className="grid grid-cols-4 gap-3">
-                <div className="p-3 rounded-md bg-[#222224] border border-[#333333]">
-                  <p className="text-[10px] text-[#888888] uppercase font-semibold">Total Requests</p>
-                  <p className="text-xl font-bold text-[#cccccc] font-mono mt-0.5">
-                    {runReport.totalRequests}
-                  </p>
-                </div>
-                <div className="p-3 rounded-md bg-[#222224] border border-[#333333]">
-                  <p className="text-[10px] text-[#888888] uppercase font-semibold">Passed Tests</p>
-                  <p className="text-xl font-bold text-emerald-400 font-mono mt-0.5">
-                    {runReport.passedCount}
-                  </p>
-                </div>
-                <div className="p-3 rounded-md bg-[#222224] border border-[#333333]">
-                  <p className="text-[10px] text-[#888888] uppercase font-semibold">Failed Tests</p>
-                  <p className="text-xl font-bold text-rose-400 font-mono mt-0.5">
-                    {runReport.failedCount}
-                  </p>
-                </div>
-                <div className="p-3 rounded-md bg-[#222224] border border-[#333333]">
-                  <p className="text-[10px] text-[#888888] uppercase font-semibold">Total Duration</p>
-                  <p className="text-xl font-bold text-[#d99b26] font-mono mt-0.5">
-                    {formatDuration(Math.round(runReport.endTime - runReport.startTime))}
-                  </p>
-                </div>
-              </div>
-
-              {/* Detailed Results List */}
-              <div className="space-y-2">
-                <span className="font-semibold text-[#cccccc] uppercase tracking-wider text-[11px]">
-                  Execution Log
-                </span>
-                {runReport.results.map((res) => {
-                  const hasFailedTests = res.testResults.some((t) => !t.passed);
-                  const isSuccess = res.status >= 200 && res.status < 400 && !hasFailedTests;
-
-                  return (
-                    <div
-                      key={res.id}
-                      className={`p-3 rounded-md border ${
-                        isSuccess
-                          ? 'bg-[#222224] border-[#333333]'
-                          : 'bg-rose-500/5 border-rose-500/30'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between mb-1.5">
-                        <div className="flex items-center gap-2">
-                          <span className={`font-mono font-bold text-[10px] px-1.5 py-0.5 rounded border ${getMethodBadgeClass(res.method)}`}>
-                            {res.method}
-                          </span>
-                          <span className="font-medium text-[#cccccc]">{res.name}</span>
-                          <span className="text-[#888888] font-mono text-[10px] truncate max-w-sm">
-                            {res.url}
-                          </span>
-                        </div>
-
-                        <div className="flex items-center gap-3 font-mono text-[11px]">
-                          <span className={res.status >= 200 && res.status < 400 ? 'text-emerald-400' : 'text-rose-400'}>
-                            {res.status} {res.statusText}
-                          </span>
-                          <span className="text-[#888888]">{res.timeMs} ms</span>
-                        </div>
-                      </div>
-
-                      {/* Test assertions for this request */}
-                      {res.testResults.length > 0 && (
-                        <div className="mt-2 pt-2 border-t border-[#333333] space-y-1">
-                          {res.testResults.map((t) => (
-                            <div key={t.id} className="flex items-center gap-1.5 text-[11px]">
-                              {t.passed ? (
-                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                              ) : (
-                                <XCircle className="w-3.5 h-3.5 text-rose-400 shrink-0" />
-                              )}
-                              <span className={t.passed ? 'text-[#cccccc]' : 'text-rose-400 font-medium'}>
-                                {t.name}
-                              </span>
-                              {t.error && (
-                                <span className="text-rose-500 font-mono text-[10px] ml-1">
-                                  — {t.error}
-                                </span>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
+            <div className="space-y-1.5">
+              {runReport.results.map((item) => (
+                <CollectionRunResultRow key={item.id} item={item} />
+              ))}
             </div>
           ) : (
-            <div className="space-y-2">
-              <span className="font-semibold text-[#888888] uppercase tracking-wider text-[11px]">
-                Requests to Execute ({allRequests.length})
-              </span>
-              <div className="space-y-1.5">
-                {allRequests.map((item, idx) => (
-                  <div
-                    key={idx}
-                    className="flex items-center justify-between p-2 rounded bg-[#222224] border border-[#333333] text-[#cccccc]"
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="text-[#666666] font-mono text-[10px] w-5">
-                        {idx + 1}.
-                      </span>
-                      <span className={`font-mono font-bold text-[10px] px-1.5 py-0.5 rounded border ${getMethodBadgeClass(item.request.method)}`}>
-                        {item.request.method}
-                      </span>
-                      <span className="font-medium text-xs text-[#cccccc]">{item.name}</span>
-                    </div>
-                    <span className="text-[#888888] font-mono text-[10px] truncate max-w-xs">
-                      {item.request.url}
-                    </span>
-                  </div>
-                ))}
-              </div>
+            <div className="h-full flex flex-col items-center justify-center text-center p-8 text-muted-foreground space-y-2 select-none">
+              <Play className="w-8 h-8 text-muted-foreground/30" />
+              <p className="text-xs font-medium text-foreground">
+                Ready to execute {allRequests.length} requests in "{collection.name}"
+              </p>
+              <p className="text-[11px] text-muted-foreground/80 max-w-sm">
+                Each request will run sequentially and execute its post-response test scripts.
+              </p>
             </div>
           )}
-        </div>
-      </div>
-    </div>
+        </ScrollArea>
+      </DialogContent>
+    </Dialog>
   );
 };

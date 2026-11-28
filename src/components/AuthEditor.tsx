@@ -1,8 +1,14 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { createPortal } from 'react-dom';
+import React, { useState } from 'react';
 import { AuthConfig, AuthType, Environment } from '../types';
 import { ChevronDown, Check, Eye, EyeOff } from 'lucide-react';
 import { VariableInput } from './VariableInput';
+import { Button } from './ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from './ui/dropdown-menu';
 
 interface AuthEditorProps {
   auth?: AuthConfig;
@@ -42,57 +48,6 @@ export const AuthEditor: React.FC<AuthEditorProps> = ({
   onOpenEnvironmentModal,
 }) => {
   const [showSecret, setShowSecret] = useState(false);
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
-  const toggleDropdown = () => {
-    if (isMenuOpen) {
-      setIsMenuOpen(false);
-      return;
-    }
-    if (triggerRef.current) {
-      const rect = triggerRef.current.getBoundingClientRect();
-      setMenuPos({
-        top: rect.bottom + 4,
-        left: rect.left,
-      });
-      setIsMenuOpen(true);
-    }
-  };
-
-  useEffect(() => {
-    if (!isMenuOpen) return;
-
-    const handlePointerDown = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      if (dropdownRef.current && dropdownRef.current.contains(target)) return;
-      if (triggerRef.current && triggerRef.current.contains(target)) return;
-      setIsMenuOpen(false);
-    };
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setIsMenuOpen(false);
-    };
-
-    const handleScroll = (e: Event) => {
-      if (dropdownRef.current && dropdownRef.current.contains(e.target as Node)) return;
-      setIsMenuOpen(false);
-    };
-
-    document.addEventListener('mousedown', handlePointerDown);
-    document.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('scroll', handleScroll, true);
-    window.addEventListener('resize', handleScroll);
-
-    return () => {
-      document.removeEventListener('mousedown', handlePointerDown);
-      document.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('scroll', handleScroll, true);
-      window.removeEventListener('resize', handleScroll);
-    };
-  }, [isMenuOpen]);
 
   const handleTypeChange = (type: AuthType) => {
     onChange({
@@ -100,7 +55,6 @@ export const AuthEditor: React.FC<AuthEditorProps> = ({
       type,
       apiKeyLocation: auth.apiKeyLocation || 'header',
     });
-    setIsMenuOpen(false);
   };
 
   const handleFieldChange = (field: keyof AuthConfig, value: any) => {
@@ -112,59 +66,42 @@ export const AuthEditor: React.FC<AuthEditorProps> = ({
 
   return (
     <div className="flex flex-col h-full text-xs p-4 overflow-y-auto select-none">
-      {/* Auth Mode Dropdown Selector (Bruno style) */}
+      {/* Auth Mode Dropdown Selector */}
       <div className="flex items-center gap-2 mb-4">
-        <button
-          ref={triggerRef}
-          type="button"
-          onClick={toggleDropdown}
-          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded bg-[#222224] hover:bg-[#26292b] border border-[#333333] text-[#cccccc] font-medium transition-colors cursor-pointer"
-        >
-          <span>{humanizeAuthMode(auth.type)}</span>
-          <ChevronDown className="w-3.5 h-3.5 text-[#777777]" />
-        </button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 text-xs font-normal gap-1.5 bg-background border-border text-foreground hover:bg-muted"
+            >
+              <span>{humanizeAuthMode(auth.type)}</span>
+              <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-44">
+            {AUTH_MODES.map((mode) => {
+              const isSelected = auth.type === mode.id;
+              return (
+                <DropdownMenuItem
+                  key={mode.id}
+                  onClick={() => handleTypeChange(mode.id)}
+                  className="flex items-center justify-between text-xs"
+                >
+                  <span>{mode.label}</span>
+                  {isSelected && <Check className="w-3.5 h-3.5 text-amber-500" />}
+                </DropdownMenuItem>
+              );
+            })}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
-
-      {/* Floating Dropdown Menu */}
-      {isMenuOpen && menuPos && createPortal(
-        <div
-          ref={dropdownRef}
-          style={{
-            position: 'fixed',
-            top: `${menuPos.top}px`,
-            left: `${menuPos.left}px`,
-            zIndex: 9999,
-          }}
-          className="w-44 bg-[#222224] border border-[#333333] rounded-md shadow-2xl py-1 text-xs select-none backdrop-blur-md animate-in fade-in zoom-in-95 duration-100"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {AUTH_MODES.map((mode) => {
-            const isSelected = auth.type === mode.id;
-            return (
-              <button
-                key={mode.id}
-                type="button"
-                onClick={() => handleTypeChange(mode.id)}
-                className={`w-full flex items-center justify-between px-3 py-1.5 text-xs text-left transition-colors cursor-pointer ${
-                  isSelected
-                    ? 'text-white bg-[#26292b] font-medium'
-                    : 'text-[#cccccc] hover:text-white hover:bg-[#26292b]'
-                }`}
-              >
-                <span>{mode.label}</span>
-                {isSelected && <Check className="w-3.5 h-3.5 text-[#d99b26]" />}
-              </button>
-            );
-          })}
-        </div>,
-        document.body
-      )}
 
       {/* Auth Content Panes */}
       <div className="max-w-md space-y-4">
         {/* NONE */}
         {auth.type === 'none' && (
-          <div className="text-xs text-[#888888]">
+          <div className="text-xs text-muted-foreground">
             This request does not use any authentication.
           </div>
         )}
@@ -173,7 +110,7 @@ export const AuthEditor: React.FC<AuthEditorProps> = ({
         {auth.type === 'bearer' && (
           <div className="space-y-3">
             <div>
-              <label className="block text-[#888888] font-normal mb-1">Token</label>
+              <label className="block text-muted-foreground font-normal mb-1">Token</label>
               <div className="relative flex items-center">
                 <VariableInput
                   type={showSecret ? 'text' : 'password'}
@@ -185,14 +122,16 @@ export const AuthEditor: React.FC<AuthEditorProps> = ({
                   onOpenEnvironmentModal={onOpenEnvironmentModal}
                   className="pr-8"
                 />
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="icon-sm"
                   onClick={() => setShowSecret(!showSecret)}
-                  className="absolute right-2.5 z-20 text-[#888888] hover:text-white cursor-pointer"
+                  className="absolute right-1 z-20 text-muted-foreground hover:text-foreground h-7 w-7"
                   title={showSecret ? 'Hide token' : 'Show token'}
                 >
                   {showSecret ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                </button>
+                </Button>
               </div>
             </div>
           </div>
@@ -202,7 +141,7 @@ export const AuthEditor: React.FC<AuthEditorProps> = ({
         {auth.type === 'basic' && (
           <div className="space-y-3">
             <div>
-              <label className="block text-[#888888] font-normal mb-1">Username</label>
+              <label className="block text-muted-foreground font-normal mb-1">Username</label>
               <VariableInput
                 placeholder="Username"
                 value={auth.basicUsername || ''}
@@ -213,7 +152,7 @@ export const AuthEditor: React.FC<AuthEditorProps> = ({
               />
             </div>
             <div>
-              <label className="block text-[#888888] font-normal mb-1">Password</label>
+              <label className="block text-muted-foreground font-normal mb-1">Password</label>
               <div className="relative flex items-center">
                 <VariableInput
                   type={showSecret ? 'text' : 'password'}
@@ -225,14 +164,16 @@ export const AuthEditor: React.FC<AuthEditorProps> = ({
                   onOpenEnvironmentModal={onOpenEnvironmentModal}
                   className="pr-8"
                 />
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="icon-sm"
                   onClick={() => setShowSecret(!showSecret)}
-                  className="absolute right-2.5 z-20 text-[#888888] hover:text-white cursor-pointer"
+                  className="absolute right-1 z-20 text-muted-foreground hover:text-foreground h-7 w-7"
                   title={showSecret ? 'Hide password' : 'Show password'}
                 >
                   {showSecret ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                </button>
+                </Button>
               </div>
             </div>
           </div>
@@ -242,7 +183,7 @@ export const AuthEditor: React.FC<AuthEditorProps> = ({
         {auth.type === 'apikey' && (
           <div className="space-y-3">
             <div>
-              <label className="block text-[#888888] font-normal mb-1">Key</label>
+              <label className="block text-muted-foreground font-normal mb-1">Key</label>
               <VariableInput
                 placeholder="e.g. X-API-Key"
                 value={auth.apiKeyName || ''}
@@ -253,7 +194,7 @@ export const AuthEditor: React.FC<AuthEditorProps> = ({
               />
             </div>
             <div>
-              <label className="block text-[#888888] font-normal mb-1">Value</label>
+              <label className="block text-muted-foreground font-normal mb-1">Value</label>
               <VariableInput
                 placeholder="Value"
                 value={auth.apiKeyValue || ''}
@@ -264,25 +205,25 @@ export const AuthEditor: React.FC<AuthEditorProps> = ({
               />
             </div>
             <div>
-              <label className="block text-[#888888] font-normal mb-1">Add To</label>
+              <label className="block text-muted-foreground font-normal mb-1">Add To</label>
               <div className="flex items-center gap-4">
-                <label className="flex items-center gap-1.5 cursor-pointer text-[#cccccc]">
+                <label className="flex items-center gap-1.5 cursor-pointer text-foreground">
                   <input
                     type="radio"
                     name="apiKeyLocation"
                     checked={auth.apiKeyLocation === 'header'}
                     onChange={() => handleFieldChange('apiKeyLocation', 'header')}
-                    className="accent-[#d99b26]"
+                    className="accent-amber-500"
                   />
                   <span>Header</span>
                 </label>
-                <label className="flex items-center gap-1.5 cursor-pointer text-[#cccccc]">
+                <label className="flex items-center gap-1.5 cursor-pointer text-foreground">
                   <input
                     type="radio"
                     name="apiKeyLocation"
                     checked={auth.apiKeyLocation === 'query'}
                     onChange={() => handleFieldChange('apiKeyLocation', 'query')}
-                    className="accent-[#d99b26]"
+                    className="accent-amber-500"
                   />
                   <span>Query Params</span>
                 </label>

@@ -1,12 +1,21 @@
 import React, { useState } from 'react';
 import { Environment, EnvironmentVariable } from '../types';
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from './ui/dialog';
+import { Button } from './ui/button';
+import { Input } from './ui/input';
+import { ScrollArea } from './ui/scroll-area';
+import { EnvironmentVariableRow } from './environments/EnvironmentVariableRow';
+import {
   Globe,
   Plus,
   Trash2,
-  CheckSquare,
-  Square,
-  X,
+  Check,
   Layers,
   Sparkles,
   Info,
@@ -30,10 +39,8 @@ export const EnvironmentModal: React.FC<EnvironmentModalProps> = ({
   onSetActiveEnvId,
 }) => {
   const [selectedEnvId, setSelectedEnvId] = useState<string>(
-    environments.length > 0 ? (activeEnvId || environments[0].id) : ''
+    environments.length > 0 ? activeEnvId || environments[0].id : ''
   );
-
-  if (!isOpen) return null;
 
   const currentEnv = environments.find((e) => e.id === selectedEnvId) || environments[0];
 
@@ -55,15 +62,13 @@ export const EnvironmentModal: React.FC<EnvironmentModalProps> = ({
   };
 
   const handleDeleteEnvironment = (id: string) => {
-    if (confirm('Are you sure you want to delete this environment?')) {
-      const remaining = environments.filter((e) => e.id !== id);
-      onUpdateEnvironments(remaining);
-      if (activeEnvId === id) {
-        onSetActiveEnvId(null);
-      }
-      if (selectedEnvId === id) {
-        setSelectedEnvId(remaining.length > 0 ? remaining[0].id : '');
-      }
+    const remaining = environments.filter((e) => e.id !== id);
+    onUpdateEnvironments(remaining);
+    if (activeEnvId === id) {
+      onSetActiveEnvId(null);
+    }
+    if (selectedEnvId === id) {
+      setSelectedEnvId(remaining.length > 0 ? remaining[0].id : '');
     }
   };
 
@@ -102,222 +107,171 @@ export const EnvironmentModal: React.FC<EnvironmentModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 select-none">
-      <div className="w-full max-w-3xl h-[560px] bg-[#222224] border border-[#333333] rounded-lg shadow-2xl overflow-hidden flex flex-col text-xs">
-        {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-[#333333] bg-[#1a1a1a]">
-          <div className="flex items-center gap-2 text-[#cccccc] font-semibold text-sm">
-            <Globe className="w-4 h-4 text-[#d99b26]" />
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-3xl h-[560px] p-0 overflow-hidden flex flex-col gap-0">
+        <DialogHeader className="p-4 border-b border-border bg-[#141517]">
+          <DialogTitle className="flex items-center gap-2">
+            <Globe className="w-4 h-4 text-primary" />
             <span>Manage Environments & Variables</span>
-          </div>
-          <button
-            onClick={onClose}
-            className="text-[#888888] hover:text-white p-1 rounded hover:bg-[#26292b] transition-colors cursor-pointer"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
+          </DialogTitle>
+          <DialogDescription>
+            Configure environment variables accessible throughout the request bar, headers, auth, and tests using {'{{variable}}'}.
+          </DialogDescription>
+        </DialogHeader>
 
-        {/* Content Body: Left sidebar (Envs) + Right editor (Variables) */}
-        <div className="flex-1 flex overflow-hidden divide-x divide-[#333333]">
-          {/* Environments list (Left) */}
-          <div className="w-56 bg-[#1a1a1a] flex flex-col h-full">
-            <div className="flex items-center justify-between p-2.5 border-b border-[#333333]">
-              <span className="text-[11px] font-semibold text-[#888888] uppercase tracking-wider">
+        <div className="flex-1 flex overflow-hidden">
+          {/* Left Sidebar: Environment List */}
+          <div className="w-56 bg-[#1a1b1e] border-r border-border flex flex-col select-none">
+            <div className="p-2 border-b border-border flex items-center justify-between">
+              <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">
                 Environments
               </span>
-              <button
+              <Button
+                variant="ghost"
+                size="icon-sm"
                 onClick={handleAddEnvironment}
-                className="flex items-center gap-1 text-[11px] text-[#d99b26] hover:text-[#e5a730] font-medium px-2 py-0.5 rounded hover:bg-[#d99b26]/10 transition-colors cursor-pointer"
+                title="Add Environment"
+                className="h-6 w-6 text-muted-foreground hover:text-foreground"
               >
                 <Plus className="w-3.5 h-3.5" />
-                <span>New</span>
-              </button>
+              </Button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-2 space-y-1">
-              {environments.length === 0 ? (
-                <p className="text-[11px] text-[#777777] italic p-3 text-center">
-                  No environments yet.
-                </p>
-              ) : (
-                environments.map((env) => {
-                  const isSelected = env.id === currentEnv?.id;
+            <ScrollArea className="flex-1 p-1">
+              <div className="space-y-0.5">
+                {environments.map((env) => {
+                  const isSelected = env.id === selectedEnvId;
                   const isActive = env.id === activeEnvId;
-
                   return (
                     <div
                       key={env.id}
                       onClick={() => setSelectedEnvId(env.id)}
-                      className={`flex items-center justify-between p-2 rounded cursor-pointer group transition-colors ${
+                      className={`group flex items-center justify-between px-2.5 py-2 rounded-md text-xs cursor-pointer transition-colors ${
                         isSelected
-                          ? 'bg-[#26292b] text-white font-medium border border-[#333333]'
-                          : 'text-[#cccccc] hover:bg-[#26292b]/60'
+                          ? 'bg-[#26282c] text-foreground font-medium border border-border/80'
+                          : 'text-muted-foreground hover:bg-[#202226] hover:text-foreground border border-transparent'
                       }`}
                     >
-                      <div className="flex items-center gap-2 truncate flex-1 min-w-0">
-                        <Layers className="w-3.5 h-3.5 text-[#d99b26] shrink-0" />
+                      <div className="flex items-center gap-2 min-w-0 flex-1 mr-1">
+                        {isActive && (
+                          <span
+                            className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0"
+                            title="Active Environment"
+                          />
+                        )}
                         <span className="truncate">{env.name}</span>
                       </div>
 
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        {isActive && (
-                          <span className="px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-emerald-400 text-[9px] font-mono border border-emerald-500/30">
-                            Active
-                          </span>
-                        )}
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteEnvironment(env.id);
-                          }}
-                          className="text-[#777777] hover:text-rose-400 p-0.5 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-                          title="Delete environment"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </button>
-                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteEnvironment(env.id);
+                        }}
+                        title="Delete Environment"
+                        className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive h-5 w-5"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </Button>
                     </div>
                   );
-                })
-              )}
-            </div>
-
-            {/* Quick Reference Box */}
-            <div className="p-2.5 border-t border-[#333333] bg-[#222224] text-[11px] text-[#888888]">
-              <div className="flex items-center gap-1 text-[#cccccc] font-semibold mb-1">
-                <Sparkles className="w-3 h-3 text-[#d99b26]" />
-                <span>Dynamic Built-ins</span>
+                })}
               </div>
-              <ul className="space-y-0.5 font-mono text-[10px] text-[#777777]">
-                <li><code className="text-[#d99b26]">{"{{$guid}}"}</code> : UUID v4</li>
-                <li><code className="text-[#d99b26]">{"{{$timestamp}}"}</code> : Epoch ms</li>
-                <li><code className="text-[#d99b26]">{"{{$isoTimestamp}}"}</code> : ISO Date</li>
-                <li><code className="text-[#d99b26]">{"{{$randomInt}}"}</code> : 1 - 1000</li>
-              </ul>
-            </div>
+            </ScrollArea>
           </div>
 
-          {/* Variables Table Editor (Right) */}
-          <div className="flex-1 flex flex-col h-full bg-[#1a1a1a] overflow-hidden">
+          {/* Right Panel: Selected Environment Variables */}
+          <div className="flex-1 flex flex-col overflow-hidden bg-[#141517]">
             {currentEnv ? (
-              <>
-                <div className="flex items-center justify-between p-3 border-b border-[#333333] bg-[#222224]">
-                  <div className="flex items-center gap-2 flex-1 max-w-sm">
-                    <label className="text-[#888888] font-medium shrink-0">Name:</label>
-                    <input
-                      type="text"
+              <div className="flex-1 flex flex-col p-4 space-y-4 overflow-hidden">
+                {/* Environment Details Header */}
+                <div className="flex items-center justify-between gap-3 pb-3 border-b border-border">
+                  <div className="flex-1">
+                    <Input
                       value={currentEnv.name}
                       onChange={(e) =>
                         handleUpdateCurrentEnv((prev) => ({ ...prev, name: e.target.value }))
                       }
-                      className="bg-[#1a1a1a] border border-[#333333] rounded px-2.5 py-1 text-[#cccccc] focus:outline-none focus:border-[#444444] font-medium"
+                      placeholder="Environment Name"
+                      className="font-semibold text-sm h-8 bg-[#1a1b1e]"
                     />
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <Button
+                    variant={activeEnvId === currentEnv.id ? 'outline' : 'amber'}
+                    size="sm"
+                    onClick={() =>
+                      onSetActiveEnvId(activeEnvId === currentEnv.id ? null : currentEnv.id)
+                    }
+                    className="h-8 text-xs font-semibold"
+                  >
                     {activeEnvId === currentEnv.id ? (
-                      <button
-                        onClick={() => onSetActiveEnvId(null)}
-                        className="px-2.5 py-1 rounded border border-emerald-500/40 text-emerald-400 bg-emerald-500/10 font-medium hover:bg-emerald-500/20 transition-colors cursor-pointer"
-                      >
-                        ✓ Currently Active
-                      </button>
+                      <>
+                        <Check className="w-3.5 h-3.5 mr-1 text-emerald-400" />
+                        <span>Active Environment</span>
+                      </>
                     ) : (
-                      <button
-                        onClick={() => onSetActiveEnvId(currentEnv.id)}
-                        className="px-2.5 py-1 rounded border border-[#333333] text-[#cccccc] hover:text-white hover:bg-[#26292b] transition-colors cursor-pointer"
-                      >
-                        Set as Active
-                      </button>
+                      <span>Set as Active</span>
                     )}
-                    <button
-                      onClick={handleAddVariable}
-                      className="flex items-center gap-1 px-3 py-1 bg-[#d99b26] hover:bg-[#c2871a] text-white rounded font-medium transition-colors cursor-pointer"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      <span>Add Variable</span>
-                    </button>
-                  </div>
+                  </Button>
                 </div>
 
                 {/* Variables List */}
-                <div className="flex-1 overflow-y-auto p-3 space-y-1.5">
-                  {currentEnv.variables.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-16 text-center text-[#777777]">
-                      <p className="text-xs">No variables in this environment.</p>
-                      <p className="text-[11px] text-[#666666] mt-1">
-                        Use variables like <code className="text-[#d99b26]">{"{{baseUrl}}"}</code> in URLs, headers, and request bodies.
-                      </p>
-                      <button
-                        onClick={handleAddVariable}
-                        className="mt-3 px-3 py-1 bg-[#d99b26]/10 text-[#d99b26] hover:bg-[#d99b26]/20 rounded border border-[#d99b26]/30 font-medium cursor-pointer"
-                      >
-                        + Add First Variable
-                      </button>
+                <div className="flex-1 flex flex-col overflow-hidden">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-medium text-muted-foreground">
+                      Variables ({currentEnv.variables.length})
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleAddVariable}
+                      className="h-6 text-[11px] px-2"
+                    >
+                      <Plus className="w-3 h-3 mr-1" />
+                      <span>Add Variable</span>
+                    </Button>
+                  </div>
+
+                  <ScrollArea className="flex-1 rounded-md border border-border bg-[#1a1b1e] p-2">
+                    <div className="space-y-1.5">
+                      {currentEnv.variables.length === 0 ? (
+                        <div className="p-8 text-center text-xs text-muted-foreground">
+                          No variables defined in this environment. Click "Add Variable" above.
+                        </div>
+                      ) : (
+                        currentEnv.variables.map((variable) => (
+                          <EnvironmentVariableRow
+                            key={variable.id}
+                            variable={variable}
+                            onUpdate={(field, val) =>
+                              handleUpdateVariable(variable.id, field, val)
+                            }
+                            onDelete={() => handleDeleteVariable(variable.id)}
+                          />
+                        ))
+                      )}
                     </div>
-                  ) : (
-                    currentEnv.variables.map((v) => (
-                      <div
-                        key={v.id}
-                        className={`flex items-center gap-2 p-1.5 rounded-md border transition-colors ${
-                          v.enabled ? 'bg-[#222224] border-[#333333]' : 'bg-[#1a1a1a] border-transparent opacity-60'
-                        } hover:border-[#333333] group`}
-                      >
-                        <button
-                          type="button"
-                          onClick={() => handleUpdateVariable(v.id, 'enabled', !v.enabled)}
-                          className="text-[#888888] hover:text-[#cccccc] p-1 cursor-pointer"
-                          title={v.enabled ? 'Disable variable' : 'Enable variable'}
-                        >
-                          {v.enabled ? (
-                            <CheckSquare className="w-4 h-4 text-[#d99b26]" />
-                          ) : (
-                            <Square className="w-4 h-4 text-[#666666]" />
-                          )}
-                        </button>
-
-                        <div className="w-1/3 relative">
-                          <input
-                            type="text"
-                            placeholder="VARIABLE"
-                            value={v.key}
-                            onChange={(e) => handleUpdateVariable(v.id, 'key', e.target.value)}
-                            className="w-full bg-[#1a1a1a] border border-[#333333] rounded px-2.5 py-1 text-[#cccccc] font-mono text-xs focus:outline-none focus:border-[#444444]"
-                          />
-                        </div>
-
-                        <div className="flex-1 relative">
-                          <input
-                            type="text"
-                            placeholder="VALUE"
-                            value={v.value}
-                            onChange={(e) => handleUpdateVariable(v.id, 'value', e.target.value)}
-                            className="w-full bg-[#1a1a1a] border border-[#333333] rounded px-2.5 py-1 text-[#cccccc] font-mono text-xs focus:outline-none focus:border-[#444444]"
-                          />
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteVariable(v.id)}
-                          className="text-[#777777] hover:text-rose-400 p-1 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-                          title="Delete variable"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    ))
-                  )}
+                  </ScrollArea>
                 </div>
-              </>
+
+                {/* Dynamic Variables Tip */}
+                <div className="p-2.5 rounded-md bg-[#1a1b1e] border border-border text-[11px] text-muted-foreground flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-primary shrink-0" />
+                  <span>
+                    Dynamic tokens like <code className="text-primary font-mono">{`{{$guid}}`}</code>, <code className="text-primary font-mono">{`{{$timestamp}}`}</code>, and <code className="text-primary font-mono">{`{{$randomInt}}`}</code> are also available automatically.
+                  </span>
+                </div>
+              </div>
             ) : (
-              <div className="flex items-center justify-center h-full text-[#777777]">
-                Select or create an environment on the left.
+              <div className="flex-1 flex items-center justify-center text-xs text-muted-foreground">
+                Select or create an environment to view variables.
               </div>
             )}
           </div>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 };

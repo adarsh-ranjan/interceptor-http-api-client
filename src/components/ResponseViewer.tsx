@@ -1,19 +1,20 @@
 import React, { useState, useMemo } from 'react';
 import { HttpResponse } from '../types';
-import { formatBytes, formatDuration, getStatusColor } from '../utils/http';
+import { formatBytes, formatDuration } from '../utils/http';
 import { JsonSyntaxViewer } from './JsonSyntaxViewer';
 import {
   Copy,
   Check,
-  Clock,
-  Database,
-  Globe,
-  Search,
   AlertTriangle,
-  CheckCircle2,
-  XCircle,
   Download,
 } from 'lucide-react';
+import { Button } from './ui/button';
+import { Badge } from './ui/badge';
+import { ScrollArea } from './ui/scroll-area';
+import { ResponseLoadingState } from './response/ResponseLoadingState';
+import { ResponseEmptyState } from './response/ResponseEmptyState';
+import { ResponseHeadersTab } from './response/ResponseHeadersTab';
+import { ResponseTestsTab } from './response/ResponseTestsTab';
 
 interface ResponseViewerProps {
   response: HttpResponse | null;
@@ -46,7 +47,7 @@ class JsonErrorBoundary extends React.Component<
   render() {
     if (this.state.hasError) {
       return (
-        <div className="flex-1 overflow-auto p-3 bg-[#1a1a1a]">
+        <div className="flex-1 overflow-auto p-3 bg-card">
           <div className="text-[11px] text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1.5 rounded mb-2 flex items-center justify-between">
             <span>Syntax highlighting encountered an issue. Rendering plain formatted view.</span>
             <button
@@ -57,7 +58,7 @@ class JsonErrorBoundary extends React.Component<
               Retry
             </button>
           </div>
-          <pre className="font-mono text-xs leading-relaxed text-slate-200 whitespace-pre-wrap select-text">
+          <pre className="font-mono text-xs leading-relaxed text-foreground whitespace-pre-wrap select-text">
             {this.props.fallbackRaw || 'Empty response'}
           </pre>
         </div>
@@ -73,10 +74,8 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({
   activeUrl,
 }) => {
   const [viewTab, setViewTab] = useState<'pretty' | 'raw' | 'preview' | 'headers' | 'tests'>('pretty');
-  const [headerFilter, setHeaderFilter] = useState('');
   const [copied, setCopied] = useState(false);
 
-  // React Rules of Hooks: Must define hooks at top-level before any conditional early returns
   const isJson = useMemo(() => {
     if (!response) return false;
     if (response.isJson) return true;
@@ -154,76 +153,29 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({
   };
 
   if (isLoading) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full text-slate-400 bg-[#1a1a1a] p-8">
-        <div className="relative flex items-center justify-center w-16 h-16 mb-4">
-          <div className="absolute w-full h-full rounded-full bg-[#d99b26]/10 animate-ping" />
-          <div className="relative w-8 h-8 rounded-full border-2 border-[#d99b26] border-t-transparent animate-spin" />
-        </div>
-        <p className="text-sm font-medium text-[#cccccc]">Executing request...</p>
-        <p className="text-xs text-[#888888] mt-1 max-w-sm text-center truncate font-mono">
-          {activeUrl || 'Connecting to host'}
-        </p>
-      </div>
-    );
+    return <ResponseLoadingState activeUrl={activeUrl} />;
   }
 
   if (!response) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full text-[#888888] bg-[#1a1a1a] p-8 select-none">
-        {/* Bruno Signature Paper Airplane Watermark */}
-        <div className="text-[#333333] mb-6 flex justify-center">
-          <svg
-            className="w-24 h-24 stroke-[#383a42] fill-none"
-            viewBox="0 0 24 24"
-            strokeWidth="1.2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <line x1="22" y1="2" x2="11" y2="13" />
-            <polygon points="22 2 15 22 11 13 2 9 22 2" />
-          </svg>
-        </div>
-
-        {/* Keyboard Shortcuts List (Matching Bruno Response Placeholder) */}
-        <div className="flex text-xs">
-          <div className="flex flex-col items-end pr-4 space-y-1.5 text-[#888888]">
-            <div>Send Request</div>
-            <div>New Request</div>
-            <div>Edit Environments</div>
-          </div>
-          <div className="flex flex-col pl-4 space-y-1.5 font-mono text-[#cccccc]">
-            <div>⌘ + ↵</div>
-            <div>⌘ + N</div>
-            <div>⌘ + E</div>
-          </div>
-        </div>
-      </div>
-    );
+    return <ResponseEmptyState />;
   }
 
-  const statusColor = getStatusColor(response.status);
   const headerKeys = Object.keys(response.headers || {});
-  const filteredHeaderKeys = headerKeys.filter((k) =>
-    k.toLowerCase().includes(headerFilter.toLowerCase()) ||
-    String(response.headers[k]).toLowerCase().includes(headerFilter.toLowerCase())
-  );
-
   const testResults = response.testResults || [];
   const passedTestsCount = testResults.filter((t) => t.passed).length;
 
   return (
-    <div className="flex flex-col h-full bg-[#1a1a1a] text-xs">
-      {/* Response Bar (Bruno-Style integrated tabs + metadata row) */}
-      <div className="flex items-center justify-between px-3 border-b border-[#333333] bg-[#1a1a1a] select-none gap-2 shrink-0">
+    <div className="flex flex-col h-full bg-card text-xs">
+      {/* Response Bar */}
+      <div className="flex items-center justify-between px-3 border-b border-border bg-card select-none gap-2 shrink-0">
         {/* Subtabs on left */}
         <div className="flex items-center gap-1">
           <button
             onClick={() => setViewTab('pretty')}
             className={`px-3 py-2 text-xs transition-colors cursor-pointer border-b-2 flex items-center gap-1.5 ${
               viewTab === 'pretty'
-                ? 'border-[#d99b26] text-[#cccccc] font-medium -mb-px'
-                : 'border-transparent text-[#888888] hover:text-[#cccccc]'
+                ? 'border-amber-500 text-foreground font-medium -mb-px'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
             }`}
           >
             <span>Response</span>
@@ -233,24 +185,37 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({
             onClick={() => setViewTab('raw')}
             className={`px-3 py-2 text-xs transition-colors cursor-pointer border-b-2 ${
               viewTab === 'raw'
-                ? 'border-[#d99b26] text-[#cccccc] font-medium -mb-px'
-                : 'border-transparent text-[#888888] hover:text-[#cccccc]'
+                ? 'border-amber-500 text-foreground font-medium -mb-px'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
             }`}
           >
             Raw
           </button>
 
+          {isHtml && (
+            <button
+              onClick={() => setViewTab('preview')}
+              className={`px-3 py-2 text-xs transition-colors cursor-pointer border-b-2 ${
+                viewTab === 'preview'
+                  ? 'border-amber-500 text-foreground font-medium -mb-px'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              Preview
+            </button>
+          )}
+
           <button
             onClick={() => setViewTab('headers')}
             className={`px-3 py-2 text-xs transition-colors cursor-pointer border-b-2 flex items-center gap-1.5 ${
               viewTab === 'headers'
-                ? 'border-[#d99b26] text-[#cccccc] font-medium -mb-px'
-                : 'border-transparent text-[#888888] hover:text-[#cccccc]'
+                ? 'border-amber-500 text-foreground font-medium -mb-px'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
             }`}
           >
             <span>Headers</span>
             {headerKeys.length > 0 && (
-              <span className="px-1.5 py-0.2 rounded-full bg-[#26292b] text-[#aaaaaa] text-[10px] font-mono">
+              <span className="px-1.5 py-0.2 rounded-full bg-muted text-muted-foreground text-[10px] font-mono">
                 {headerKeys.length}
               </span>
             )}
@@ -261,8 +226,8 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({
               onClick={() => setViewTab('tests')}
               className={`px-3 py-2 text-xs transition-colors cursor-pointer border-b-2 flex items-center gap-1.5 ${
                 viewTab === 'tests'
-                  ? 'border-[#d99b26] text-[#cccccc] font-medium -mb-px'
-                  : 'border-transparent text-[#888888] hover:text-[#cccccc]'
+                  ? 'border-amber-500 text-foreground font-medium -mb-px'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
               }`}
             >
               <span>Tests</span>
@@ -277,15 +242,23 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({
           )}
         </div>
 
-        {/* Right side metadata & actions (Bruno Status, Duration, Size) */}
+        {/* Right side metadata & actions */}
         <div className="flex items-center gap-3">
           {response.status > 0 ? (
             <div className="flex items-center gap-2 font-mono text-xs">
-              <span className="font-bold text-emerald-400">{response.status} {response.statusText}</span>
-              <span className="text-[#666666]">•</span>
-              <span className="text-[#999999]">{formatDuration(response.timeMs)}</span>
-              <span className="text-[#666666]">•</span>
-              <span className="text-[#999999]">{formatBytes(response.sizeBytes)}</span>
+              <span className={`font-bold ${
+                response.status >= 200 && response.status < 300
+                  ? 'text-emerald-400'
+                  : response.status >= 400
+                  ? 'text-rose-400'
+                  : 'text-amber-400'
+              }`}>
+                {response.status} {response.statusText}
+              </span>
+              <span className="text-muted-foreground/40">•</span>
+              <span className="text-muted-foreground">{formatDuration(response.timeMs)}</span>
+              <span className="text-muted-foreground/40">•</span>
+              <span className="text-muted-foreground">{formatBytes(response.sizeBytes)}</span>
             </div>
           ) : (
             <div className="flex items-center gap-1.5 px-2 py-0.5 rounded font-mono font-bold text-rose-400">
@@ -294,21 +267,25 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({
             </div>
           )}
 
-          <div className="w-px h-3.5 bg-[#333333]" />
+          <div className="w-px h-3.5 bg-border" />
 
           {/* Actions: Save & Copy */}
           <div className="flex items-center gap-1">
-            <button
+            <Button
+              variant="ghost"
+              size="icon-sm"
               onClick={handleSaveResponse}
-              className="p-1 text-[#888888] hover:text-white transition-colors rounded hover:bg-[#26292b] cursor-pointer"
+              className="text-muted-foreground hover:text-foreground"
               title="Save response to file"
             >
               <Download className="w-3.5 h-3.5" />
-            </button>
+            </Button>
 
-            <button
+            <Button
+              variant="ghost"
+              size="icon-sm"
               onClick={handleCopy}
-              className="p-1 text-[#888888] hover:text-white transition-colors rounded hover:bg-[#26292b] cursor-pointer"
+              className="text-muted-foreground hover:text-foreground"
               title="Copy response body"
             >
               {copied ? (
@@ -316,7 +293,7 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({
               ) : (
                 <Copy className="w-3.5 h-3.5" />
               )}
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -333,20 +310,20 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({
               />
             </JsonErrorBoundary>
           ) : (
-            <div className="flex-1 overflow-auto p-3">
-              <pre className="font-mono text-xs leading-relaxed text-slate-200 whitespace-pre-wrap select-text selection:bg-orange-500/30">
-                {response.rawBody || <span className="text-slate-500">Empty response body</span>}
+            <ScrollArea className="flex-1 p-3">
+              <pre className="font-mono text-xs leading-relaxed text-foreground whitespace-pre-wrap select-text selection:bg-amber-500/30">
+                {response.rawBody || <span className="text-muted-foreground">Empty response body</span>}
               </pre>
-            </div>
+            </ScrollArea>
           )
         )}
 
         {viewTab === 'raw' && (
-          <div className="flex-1 overflow-auto p-3">
-            <pre className="font-mono text-xs leading-relaxed text-slate-300 whitespace-pre-wrap select-text selection:bg-orange-500/30">
-              {response.rawBody || <span className="text-slate-500">Empty response body</span>}
+          <ScrollArea className="flex-1 p-3">
+            <pre className="font-mono text-xs leading-relaxed text-foreground/90 whitespace-pre-wrap select-text selection:bg-amber-500/30">
+              {response.rawBody || <span className="text-muted-foreground">Empty response body</span>}
             </pre>
-          </div>
+          </ScrollArea>
         )}
 
         {viewTab === 'preview' && (
@@ -361,80 +338,12 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({
         )}
 
         {viewTab === 'headers' && (
-          <div className="flex-1 overflow-auto p-3">
-            <div className="border border-[#333333] rounded overflow-hidden">
-            <table className="w-full text-left font-mono text-[11px]">
-              <thead className="bg-[#222224] text-[#888888] border-b border-[#333333]">
-                <tr>
-                  <th className="py-1.5 px-3 font-semibold w-1/3">Header</th>
-                  <th className="py-1.5 px-3 font-semibold">Value</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#333333] bg-[#1a1a1a]">
-                {filteredHeaderKeys.length === 0 ? (
-                  <tr>
-                    <td colSpan={2} className="py-4 text-center text-[#666666]">
-                      No matching headers
-                    </td>
-                  </tr>
-                ) : (
-                  filteredHeaderKeys.map((key) => (
-                    <tr key={key} className="hover:bg-[#222224] transition-colors">
-                      <td className="py-1.5 px-3 text-[#cccccc] font-medium select-text break-all">
-                        {key}
-                      </td>
-                      <td className="py-1.5 px-3 text-[#999999] select-text break-all">
-                        {response.headers[key]}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+          <ResponseHeadersTab headers={response.headers || {}} />
+        )}
 
-      {viewTab === 'tests' && (
-        <div className="flex-1 overflow-auto p-3">
-          <div className="space-y-2">
-            <div className="flex items-center justify-between pb-2 border-b border-[#333333]">
-              <span className="font-semibold text-[#cccccc]">
-                Assertion Breakdown
-              </span>
-              <span className="text-[#888888]">
-                {passedTestsCount} passed, {testResults.length - passedTestsCount} failed
-              </span>
-            </div>
-
-            {testResults.map((result) => (
-              <div
-                key={result.id}
-                className={`p-2.5 rounded-md border flex items-start gap-2.5 ${
-                  result.passed
-                    ? 'bg-emerald-500/5 border-emerald-500/20 text-emerald-300'
-                    : 'bg-rose-500/5 border-rose-500/20 text-rose-300'
-                }`}
-              >
-                {result.passed ? (
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-                ) : (
-                  <XCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
-                )}
-
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-slate-200">{result.name}</p>
-                  {result.error && (
-                    <p className="text-[11px] font-mono text-rose-400 mt-1 whitespace-pre-wrap">
-                      {result.error}
-                    </p>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+        {viewTab === 'tests' && (
+          <ResponseTestsTab testResults={testResults} />
+        )}
       </div>
     </div>
   );

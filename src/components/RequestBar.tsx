@@ -9,6 +9,7 @@ import {
 } from '../utils/variables';
 import { VariableHoverTooltip } from './VariableHoverTooltip';
 import { HttpMethodDropdown } from './HttpMethodDropdown';
+import { Button } from './ui/button';
 import { Save, Code2 } from 'lucide-react';
 
 interface RequestBarProps {
@@ -59,7 +60,6 @@ export const RequestBar: React.FC<RequestBarProps> = ({
     y: number;
   } | null>(null);
 
-  // Clear hover timeout on unmount
   useEffect(() => {
     return () => {
       if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
@@ -68,7 +68,6 @@ export const RequestBar: React.FC<RequestBarProps> = ({
 
   const variablesInUrl = extractVariablesFromText(url);
 
-  // Measure character width for monospace input
   const getCharWidth = (inputEl: HTMLInputElement): number => {
     if (charWidthRef.current > 0) return charWidthRef.current;
     try {
@@ -104,33 +103,23 @@ export const RequestBar: React.FC<RequestBarProps> = ({
   };
 
   const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
-    const text = e.clipboardData.getData('text');
-    if (isCurlCommand(text)) {
+    const pastedText = e.clipboardData.getData('text');
+    if (isCurlCommand(pastedText)) {
       e.preventDefault();
-      const parsed = parseCurlCommand(text);
-      if (parsed) {
-        if (onImportCurl) {
-          onImportCurl(parsed);
-        } else {
-          onUrlChange(parsed.url);
-        }
+      const parsed = parseCurlCommand(pastedText);
+      onMethodChange(parsed.method);
+      onUrlChange(parsed.url);
+      if (onImportCurl) {
+        onImportCurl(parsed);
       }
     }
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setHoveredVar(null);
-    const val = e.target.value;
-    if (isCurlCommand(val)) {
-      const parsed = parseCurlCommand(val);
-      if (parsed) {
-        if (onImportCurl) {
-          onImportCurl(parsed);
-          return;
-        }
-      }
+    onUrlChange(e.target.value);
+    if (backdropRef.current && inputRef.current) {
+      backdropRef.current.scrollLeft = inputRef.current.scrollLeft;
     }
-    onUrlChange(val);
   };
 
   const handleScroll = () => {
@@ -140,38 +129,24 @@ export const RequestBar: React.FC<RequestBarProps> = ({
   };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLInputElement>) => {
-    if (!inputRef.current) return;
+    if (!inputRef.current || variablesInUrl.length === 0) return;
+
     const input = inputRef.current;
     const rect = input.getBoundingClientRect();
     const style = window.getComputedStyle(input);
-    const paddingLeft = parseFloat(style.paddingLeft) || 4;
+    const paddingLeft = parseFloat(style.paddingLeft) || 0;
+    const mouseX = e.clientX - rect.left - paddingLeft + input.scrollLeft;
 
     const charWidth = getCharWidth(input);
-    if (charWidth <= 0) return;
-
-    const mouseX = e.clientX - rect.left - paddingLeft + input.scrollLeft;
-    if (mouseX < 0) {
-      if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
-      hoverTimeoutRef.current = setTimeout(() => setHoveredVar(null), 100);
-      return;
-    }
-
     const charIndex = Math.floor(mouseX / charWidth);
-    const matched = findVariableAtCharIndex(url, charIndex);
 
-    if (matched) {
+    const matchedVar = findVariableAtCharIndex(url, charIndex);
+    if (matchedVar) {
       if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
-      const info = resolveVariableInfo(matched.varName, activeEnvironment, environments);
-      const varStartPx = rect.left + paddingLeft + (matched.startIndex * charWidth) - input.scrollLeft;
-      const varWidthPx = (matched.endIndex - matched.startIndex) * charWidth;
-      const x = varStartPx + varWidthPx / 2;
-      const y = rect.bottom + 6;
-
-      setHoveredVar({
-        info,
-        x,
-        y,
-      });
+      const info = resolveVariableInfo(matchedVar, activeEnvironment, environments);
+      const targetX = Math.min(window.innerWidth - 320, Math.max(16, e.clientX - 60));
+      const targetY = rect.bottom + 8;
+      setHoveredVar({ info, x: targetX, y: targetY });
     } else {
       if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
       hoverTimeoutRef.current = setTimeout(() => {
@@ -193,76 +168,74 @@ export const RequestBar: React.FC<RequestBarProps> = ({
 
   const handleTooltipMouseLeave = () => {
     if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
-    setHoveredVar(null);
+    hoverTimeoutRef.current = setTimeout(() => {
+      setHoveredVar(null);
+    }, 150);
   };
 
-  const renderBackdropContent = () => {
-    if (!url) return null;
-    const vars = extractVariablesFromText(url);
-    if (vars.length === 0) return null;
+  const renderHighlightedBackdrop = () => {
+    if (variablesInUrl.length === 0) return null;
 
-    const elements: React.ReactNode[] = [];
+    const regex = /\{\{([^}]+)\}\}/g;
+    const segments: React.ReactNode[] = [];
     let lastIndex = 0;
+    let match: RegExpExecArray | null;
 
-    vars.forEach((v, idx) => {
-      if (v.startIndex > lastIndex) {
-        elements.push(
-          <span key={`plain-${lastIndex}`} className="text-slate-100">
-            {url.substring(lastIndex, v.startIndex)}
+    while ((match = regex.exec(url)) !== null) {
+      if (match.index > lastIndex) {
+        segments.push(
+          <span key={`text-${lastIndex}`} className="text-foreground">
+            {url.substring(lastIndex, match.index)}
           </span>
         );
       }
 
-      const info = resolveVariableInfo(v.varName, activeEnvironment, environments);
-      elements.push(
-        <span
-          key={`var-${v.startIndex}-${idx}`}
-          className={`font-semibold ${
-            info.isResolved ? 'text-emerald-400' : 'text-rose-400'
-          }`}
-        >
-          {v.fullMatch}
+      const varName = match[1].trim();
+      const info = resolveVariableInfo(varName, activeEnvironment, environments);
+      const pillClass = info.isResolved
+        ? 'bg-emerald-950/40 text-emerald-400 border border-emerald-800/40 font-semibold rounded px-1'
+        : 'bg-rose-950/40 text-rose-400 border border-rose-800/40 font-semibold rounded px-1';
+
+      segments.push(
+        <span key={`var-${match.index}`} className={pillClass}>
+          {match[0]}
         </span>
       );
-      lastIndex = v.endIndex;
-    });
+
+      lastIndex = match.index + match[0].length;
+    }
 
     if (lastIndex < url.length) {
-      elements.push(
-        <span key={`plain-${lastIndex}`} className="text-slate-100">
+      segments.push(
+        <span key={`text-${lastIndex}`} className="text-foreground">
           {url.substring(lastIndex)}
         </span>
       );
     }
 
-    return elements;
+    return segments;
   };
 
   return (
-    <div className="flex items-center gap-2 px-4 pt-3 pb-2 bg-[#1a1a1a] w-full relative select-none">
-      {/* Bruno-Style Integrated URL Input Box (QueryUrl) */}
-      <div
-        ref={containerRef}
-        className="flex-1 relative flex items-center bg-[#1a1a1a] border border-[#333333] rounded-md px-3 h-[34px] focus-within:border-[#444444] transition-colors"
-      >
-        {/* Method Label Button (Directly inside on the left, no borders, no chevron) */}
-        <HttpMethodDropdown
-          variant="bare"
-          method={method}
-          onChange={(m) => onMethodChange(m as HttpMethod)}
-          anchorRef={containerRef}
-          className="mr-2.5"
-        />
+    <div ref={containerRef} className="flex items-center gap-2 p-2 bg-[#141517] relative select-none">
+      {/* Integrated Single-Box Request Bar */}
+      <div className="flex-1 flex items-center bg-[#1a1b1e] border border-border rounded-md px-2 py-1 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary shadow-xs transition-colors h-[34px]">
+        {/* Custom Method Dropdown */}
+        <div className="shrink-0 mr-2 border-r border-border pr-2">
+          <HttpMethodDropdown method={method} onChange={onMethodChange} />
+        </div>
 
-        {/* URL Input with Variable Highlighting */}
+        {/* Input & Highlight Backdrop */}
         <div className="flex-1 relative flex items-center overflow-hidden h-full">
-          <div
-            ref={backdropRef}
-            className="absolute inset-0 pointer-events-none flex items-center overflow-hidden pl-0.5 pr-16 text-xs font-mono whitespace-pre select-none text-transparent"
-            aria-hidden="true"
-          >
-            {renderBackdropContent()}
-          </div>
+          {variablesInUrl.length > 0 && (
+            <div
+              ref={backdropRef}
+              aria-hidden="true"
+              className="absolute inset-0 flex items-center pointer-events-none overflow-x-hidden whitespace-pre text-xs font-mono"
+            >
+              {renderHighlightedBackdrop()}
+            </div>
+          )}
 
           <input
             ref={inputRef}
@@ -274,61 +247,63 @@ export const RequestBar: React.FC<RequestBarProps> = ({
             onMouseMove={handleMouseMove}
             onMouseLeave={handleMouseLeave}
             onScroll={handleScroll}
-            placeholder="Enter URL or paste a cURL request"
+            placeholder="Enter URL or paste a cURL command..."
             className={`w-full bg-transparent pl-0.5 pr-16 text-xs font-mono outline-none z-10 ${
-              variablesInUrl.length > 0 ? 'text-transparent caret-white' : 'text-[#ffffff] placeholder:text-[#666666]'
+              variablesInUrl.length > 0
+                ? 'text-transparent caret-white'
+                : 'text-foreground placeholder:text-muted-foreground'
             }`}
           />
         </div>
 
-        {/* Action Buttons Inside URL Input Box: Code Generator & Save */}
-        <div className="flex items-center gap-2 shrink-0 ml-1.5 z-20">
-          {/* Code Snippet Button (</>) */}
-          <button
-            type="button"
+        {/* Actions inside box: Code Snippet & Save */}
+        <div className="flex items-center gap-1 shrink-0 ml-1.5 z-20">
+          <Button
+            variant="ghost"
+            size="icon-sm"
             onClick={onOpenCodeSnippet}
-            className="p-1 text-[#999999] hover:text-[#cccccc] hover:bg-[#26292b] rounded transition-colors cursor-pointer"
             title="Generate Code Snippet (cURL, Python, JS, Go)"
+            className="h-6 w-6 text-muted-foreground hover:text-foreground"
           >
             <Code2 className="w-3.5 h-3.5" />
-          </button>
+          </Button>
 
-          {/* Save Button (Floppy disk icon) */}
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="icon-sm"
             onClick={onSave}
-            className={`p-1 rounded transition-colors cursor-pointer relative ${
-              isDirty
-                ? 'text-[#d99b26] hover:text-[#e5a730]'
-                : 'text-[#999999] hover:text-[#cccccc] hover:bg-[#26292b]'
-            }`}
             title={isDirty ? `Save Request (${saveShortcut}) • Unsaved changes` : `Save Request (${saveShortcut})`}
+            className={`h-6 w-6 relative ${
+              isDirty ? 'text-primary hover:text-primary' : 'text-muted-foreground hover:text-foreground'
+            }`}
           >
             <Save className="w-3.5 h-3.5" />
             {isDirty && (
-              <span className="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-[#d99b26] shadow-xs shadow-amber-500/50" />
+              <span className="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-primary shadow-xs" />
             )}
-          </button>
+          </Button>
         </div>
       </div>
 
-      {/* Send or Cancel Button (Outside Input Box) */}
+      {/* Primary Send / Cancel Button */}
       {isLoading ? (
-        <button
-          type="button"
+        <Button
+          variant="destructive"
+          size="sm"
           onClick={onCancel}
-          className="px-4 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-md text-xs font-medium shadow-sm transition-all animate-pulse shrink-0 cursor-pointer h-[34px]"
+          className="h-[34px] px-4 animate-pulse font-medium"
         >
           Cancel
-        </button>
+        </Button>
       ) : (
-        <button
-          type="button"
+        <Button
+          variant="amber"
+          size="sm"
           onClick={onSend}
-          className="px-5 py-1.5 bg-[#d99b26] hover:bg-[#c48b20] text-white rounded-md text-xs font-semibold shadow-xs transition-colors shrink-0 cursor-pointer h-[34px]"
+          className="h-[34px] px-5 font-semibold text-black"
         >
           Send
-        </button>
+        </Button>
       )}
 
       {/* Variable Hover Tooltip */}

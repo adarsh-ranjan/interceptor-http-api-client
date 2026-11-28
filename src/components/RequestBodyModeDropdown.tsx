@@ -1,18 +1,25 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { createPortal } from 'react-dom';
+import React from 'react';
 import { BodyType } from '../types';
 import {
   ChevronDown,
   Braces,
-  Code2,
   FileText,
-  Database,
   Files,
   AlignLeft,
   FileUp,
   X,
   Check,
 } from 'lucide-react';
+import { Button } from './ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from './ui/dropdown-menu';
 
 interface RequestBodyModeDropdownProps {
   bodyMode: BodyType;
@@ -72,139 +79,48 @@ const MODE_GROUPS: { name: string; options: ModeOption[] }[] = [
 export const RequestBodyModeDropdown: React.FC<RequestBodyModeDropdownProps> = ({
   bodyMode,
   onModeChange,
-  onPrettify,
 }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
-  const toggleDropdown = () => {
-    if (isOpen) {
-      setIsOpen(false);
-      return;
-    }
-    if (triggerRef.current) {
-      const rect = triggerRef.current.getBoundingClientRect();
-      const menuWidth = 190;
-      let left = rect.right - menuWidth;
-      if (left < 10) left = 10;
-      setMenuPos({
-        top: rect.bottom + 4,
-        left,
-      });
-      setIsOpen(true);
-    }
-  };
-
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const handlePointerDown = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      if (dropdownRef.current && dropdownRef.current.contains(target)) return;
-      if (triggerRef.current && triggerRef.current.contains(target)) return;
-      setIsOpen(false);
-    };
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setIsOpen(false);
-    };
-
-    const handleScroll = (e: Event) => {
-      if (dropdownRef.current && dropdownRef.current.contains(e.target as Node)) return;
-      setIsOpen(false);
-    };
-
-    document.addEventListener('mousedown', handlePointerDown);
-    document.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('scroll', handleScroll, true);
-    window.addEventListener('resize', handleScroll);
-
-    return () => {
-      document.removeEventListener('mousedown', handlePointerDown);
-      document.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('scroll', handleScroll, true);
-      window.removeEventListener('resize', handleScroll);
-    };
-  }, [isOpen]);
-
-  const isPrettifyVisible = bodyMode === 'json';
-
   return (
-    <div className="flex items-center gap-3 select-none text-xs">
-      {/* Dropdown trigger: e.g. JSON ▾ or No Body ▾ (matches Image 2 & 6) */}
-      <button
-        ref={triggerRef}
-        type="button"
-        onClick={toggleDropdown}
-        className="flex items-center gap-1 font-medium text-xs text-[#d99b26] hover:text-[#e5a730] transition-colors cursor-pointer"
-        title="Change Body Mode"
-      >
-        <span>{humanizeRequestBodyMode(bodyMode)}</span>
-        <span className="text-[#888888] text-[10px] leading-none select-none">▾</span>
-      </button>
-
-      {/* Prettify button immediately next to it (matches Image 2 & 6) */}
-      {isPrettifyVisible && onPrettify && (
-        <button
-          type="button"
-          onClick={onPrettify}
-          className="text-[#999999] hover:text-white transition-colors cursor-pointer text-xs font-normal"
-          title="Format and prettify JSON payload"
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-7 text-xs font-normal gap-1.5 bg-background border-border text-foreground hover:bg-muted"
         >
-          Prettify
-        </button>
-      )}
-
-      {/* Floating Bruno-style Dropdown Menu via Portal (matches Image 5) */}
-      {isOpen && menuPos && createPortal(
-        <div
-          ref={dropdownRef}
-          style={{
-            position: 'fixed',
-            top: `${menuPos.top}px`,
-            left: `${menuPos.left}px`,
-            zIndex: 9999,
-          }}
-          className="w-48 bg-[#222224] border border-[#333333] rounded-md shadow-2xl py-1 text-xs select-none backdrop-blur-md animate-in fade-in zoom-in-95 duration-100"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {MODE_GROUPS.map((group, groupIndex) => (
-            <div key={group.name} className={groupIndex > 0 ? 'mt-1 pt-1 border-t border-[#333333]/60' : ''}>
-              <div className="px-3 py-1 text-[10px] font-semibold tracking-wider text-[#777777] uppercase font-sans">
+          <span>{humanizeRequestBodyMode(bodyMode)}</span>
+          <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-48">
+        {MODE_GROUPS.map((group, groupIdx) => (
+          <React.Fragment key={group.name}>
+            {groupIdx > 0 && <DropdownMenuSeparator />}
+            <DropdownMenuGroup>
+              <DropdownMenuLabel className="text-[10px] text-muted-foreground font-semibold px-2 py-1">
                 {group.name}
-              </div>
-              {group.options.map((option) => {
-                const isSelected = bodyMode === option.id;
-                const IconComponent = option.icon;
+              </DropdownMenuLabel>
+              {group.options.map((opt) => {
+                const Icon = opt.icon;
+                const isSelected = bodyMode === opt.id;
                 return (
-                  <button
-                    key={option.id}
-                    type="button"
-                    onClick={() => {
-                      onModeChange(option.id);
-                      setIsOpen(false);
-                    }}
-                    className={`w-full flex items-center justify-between px-3 py-1.5 text-xs text-left transition-colors cursor-pointer ${
-                      isSelected
-                        ? 'text-white bg-[#26292b] font-medium'
-                        : 'text-[#cccccc] hover:text-white hover:bg-[#26292b]'
-                    }`}
+                  <DropdownMenuItem
+                    key={opt.id}
+                    onClick={() => onModeChange(opt.id)}
+                    className="flex items-center justify-between text-xs"
                   >
                     <div className="flex items-center gap-2">
-                      <IconComponent className={`w-3.5 h-3.5 ${isSelected ? 'text-[#d99b26]' : 'text-[#888888]'}`} />
-                      <span>{option.label}</span>
+                      <Icon className="w-3.5 h-3.5 text-muted-foreground" />
+                      <span>{opt.label}</span>
                     </div>
-                    {isSelected && <Check className="w-3.5 h-3.5 text-[#d99b26] shrink-0" />}
-                  </button>
+                    {isSelected && <Check className="w-3.5 h-3.5 text-amber-500" />}
+                  </DropdownMenuItem>
                 );
               })}
-            </div>
-          ))}
-        </div>,
-        document.body
-      )}
-    </div>
+            </DropdownMenuGroup>
+          </React.Fragment>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 };

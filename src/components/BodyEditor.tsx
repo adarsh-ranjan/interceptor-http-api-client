@@ -4,6 +4,7 @@ import { FileUp, Trash2 } from 'lucide-react';
 import { JsonBodyEditor } from './JsonBodyEditor';
 import { KeyValueEditor } from './KeyValueEditor';
 import { VariableHoverTooltip } from './VariableHoverTooltip';
+import { Button } from './ui/button';
 import {
   findVariableInMultilineText,
   resolveVariableInfo,
@@ -122,7 +123,6 @@ export const BodyEditor: React.FC<BodyEditorProps> = ({
     }
   };
 
-  // Convert FormDataItems <-> KeyValuePairs for KeyValueEditor
   const formDataAsKeyValues: KeyValuePair[] = formData.map((f) => ({
     id: f.id,
     key: f.key,
@@ -148,15 +148,15 @@ export const BodyEditor: React.FC<BodyEditorProps> = ({
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-[#1a1a1a] text-xs overflow-hidden">
-      {/* NO BODY (matches Bruno Image 5) */}
+    <div className="flex-1 flex flex-col h-full bg-card text-xs overflow-hidden">
+      {/* NO BODY */}
       {bodyType === 'none' && (
-        <div className="p-4 text-xs text-[#888888] select-none">
+        <div className="p-4 text-xs text-muted-foreground select-none">
           No Body
         </div>
       )}
 
-      {/* JSON BODY EDITOR (matches Bruno Image 6) */}
+      {/* JSON BODY EDITOR */}
       {bodyType === 'json' && (
         <JsonBodyEditor
           value={bodyContent}
@@ -182,7 +182,7 @@ export const BodyEditor: React.FC<BodyEditorProps> = ({
             onMouseLeave={handleRawMouseLeave}
             placeholder="Enter raw text payload..."
             spellCheck={false}
-            className="w-full h-full p-4 font-mono text-xs bg-transparent text-[#cccccc] resize-none focus:outline-none leading-relaxed selection:bg-[#d99b26]/30 caret-[#d99b26]"
+            className="w-full h-full p-4 font-mono text-xs bg-transparent text-foreground resize-none focus:outline-none leading-relaxed selection:bg-amber-500/30 caret-amber-500"
           />
           {hoveredRawVar && (
             <VariableHoverTooltip
@@ -202,7 +202,7 @@ export const BodyEditor: React.FC<BodyEditorProps> = ({
         </div>
       )}
 
-      {/* MULTIPART FORM-DATA (Bruno EditableTable) */}
+      {/* MULTIPART FORM-DATA */}
       {bodyType === 'form-data' && (
         <KeyValueEditor
           items={formDataAsKeyValues}
@@ -218,7 +218,7 @@ export const BodyEditor: React.FC<BodyEditorProps> = ({
         />
       )}
 
-      {/* URLENCODED (Bruno EditableTable) */}
+      {/* URLENCODED */}
       {bodyType === 'urlencoded' && (
         <KeyValueEditor
           items={urlEncoded}
@@ -237,28 +237,32 @@ export const BodyEditor: React.FC<BodyEditorProps> = ({
       {/* BINARY FILE */}
       {bodyType === 'binary' && (
         <div className="flex flex-col items-start p-6 text-xs space-y-4">
-          <span className="font-semibold text-xs text-[#888888]">File / Binary</span>
+          <span className="font-semibold text-xs text-muted-foreground">File / Binary</span>
           {binaryFilePath ? (
-            <div className="flex items-center gap-3 bg-[#222224] border border-[#333333] rounded px-3 py-2">
-              <span className="font-mono text-xs text-[#cccccc]">{binaryFileName || binaryFilePath}</span>
-              <button
+            <div className="flex items-center gap-3 bg-card border border-border rounded-md px-3 py-2">
+              <span className="font-mono text-xs text-foreground">{binaryFileName || binaryFilePath}</span>
+              <Button
                 type="button"
+                variant="ghost"
+                size="icon-sm"
                 onClick={() => onBinaryFileChange(undefined, undefined)}
-                className="text-[#888888] hover:text-rose-400 cursor-pointer p-0.5"
+                className="text-muted-foreground hover:text-destructive h-6 w-6"
                 title="Remove file"
               >
                 <Trash2 className="w-3.5 h-3.5" />
-              </button>
+              </Button>
             </div>
           ) : (
-            <button
+            <Button
               type="button"
+              variant="outline"
+              size="sm"
               onClick={handlePickBinaryFile}
-              className="flex items-center gap-2 px-3 py-1.5 bg-[#222224] hover:bg-[#26292b] border border-[#333333] rounded text-[#cccccc] transition-colors cursor-pointer"
+              className="flex items-center gap-2 text-foreground"
             >
-              <FileUp className="w-3.5 h-3.5 text-[#d99b26]" />
+              <FileUp className="w-3.5 h-3.5 text-amber-500" />
               <span>Choose File...</span>
-            </button>
+            </Button>
           )}
         </div>
       )}
