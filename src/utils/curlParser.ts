@@ -1,5 +1,6 @@
 import { HttpMethod, KeyValuePair, AuthConfig, BodyType, FormDataItem } from '../types/index';
 import { extractParamsFromUrl } from './http';
+import { generateId } from './id';
 
 export interface ParsedCurlResult {
   method: HttpMethod;
@@ -37,8 +38,35 @@ function safeBase64Decode(str: string): string {
   return '';
 }
 
-function generateId(): string {
-  return Math.random().toString(36).substring(2, 9);
+function parseBasicAuthArg(userArg: string): AuthConfig {
+  const colonIdx = userArg.indexOf(':');
+  if (colonIdx !== -1) {
+    return {
+      type: 'basic',
+      basicUsername: userArg.slice(0, colonIdx),
+      basicPassword: userArg.slice(colonIdx + 1),
+    };
+  }
+  return {
+    type: 'basic',
+    basicUsername: userArg,
+    basicPassword: '',
+  };
+}
+
+function ensureContentTypeHeader(
+  headerPairs: KeyValuePair[],
+  currentContentType: string,
+  expectedType: string
+): void {
+  if (!currentContentType.includes(expectedType)) {
+    headerPairs.push({
+      id: generateId(),
+      key: 'Content-Type',
+      value: expectedType,
+      enabled: true,
+    });
+  }
 }
 
 /**
@@ -156,38 +184,10 @@ export function parseCurlCommand(cmd: string): ParsedCurlResult | null {
     else if (token === '-u' || token === '--user') {
       i++;
       if (i < tokens.length) {
-        const userArg = tokens[i];
-        const colonIdx = userArg.indexOf(':');
-        if (colonIdx !== -1) {
-          auth = {
-            type: 'basic',
-            basicUsername: userArg.slice(0, colonIdx),
-            basicPassword: userArg.slice(colonIdx + 1),
-          };
-        } else {
-          auth = {
-            type: 'basic',
-            basicUsername: userArg,
-            basicPassword: '',
-          };
-        }
+        auth = parseBasicAuthArg(tokens[i]);
       }
     } else if (token.startsWith('-u') && token.length > 2) {
-      const userArg = token.slice(2);
-      const colonIdx = userArg.indexOf(':');
-      if (colonIdx !== -1) {
-        auth = {
-          type: 'basic',
-          basicUsername: userArg.slice(0, colonIdx),
-          basicPassword: userArg.slice(colonIdx + 1),
-        };
-      } else {
-        auth = {
-          type: 'basic',
-          basicUsername: userArg,
-          basicPassword: '',
-        };
-      }
+      auth = parseBasicAuthArg(token.slice(2));
     }
     // OAuth2 Bearer flag: --oauth2-bearer
     else if (token === '--oauth2-bearer') {
@@ -437,14 +437,7 @@ export function parseCurlCommand(cmd: string): ParsedCurlResult | null {
     bodyContent = urlEncoded
       .map((p) => `${encodeURIComponent(p.key)}=${encodeURIComponent(p.value)}`)
       .join('&');
-    if (!contentType.includes('application/x-www-form-urlencoded')) {
-      headerPairs.push({
-        id: generateId(),
-        key: 'Content-Type',
-        value: 'application/x-www-form-urlencoded',
-        enabled: true,
-      });
-    }
+    ensureContentTypeHeader(headerPairs, contentType, 'application/x-www-form-urlencoded');
   } else if (rawDataParts.length > 0) {
     const rawJoined = rawDataParts.join('&');
     bodyContent = rawJoined;
@@ -463,14 +456,7 @@ export function parseCurlCommand(cmd: string): ParsedCurlResult | null {
         // Keep as-is if JSON.parse fails
       }
       // Ensure Content-Type header if missing
-      if (!contentType.includes('application/json')) {
-        headerPairs.push({
-          id: generateId(),
-          key: 'Content-Type',
-          value: 'application/json',
-          enabled: true,
-        });
-      }
+      ensureContentTypeHeader(headerPairs, contentType, 'application/json');
     } else if (
       contentType.includes('application/x-www-form-urlencoded') ||
       /^[a-zA-Z0-9_%+-]+=[^&]*(&[a-zA-Z0-9_%+-]+=[^&]*)*$/.test(trimmed)
@@ -488,14 +474,7 @@ export function parseCurlCommand(cmd: string): ParsedCurlResult | null {
           enabled: true,
         };
       });
-      if (!contentType.includes('application/x-www-form-urlencoded')) {
-        headerPairs.push({
-          id: generateId(),
-          key: 'Content-Type',
-          value: 'application/x-www-form-urlencoded',
-          enabled: true,
-        });
-      }
+      ensureContentTypeHeader(headerPairs, contentType, 'application/x-www-form-urlencoded');
     } else {
       bodyType = 'text';
     }

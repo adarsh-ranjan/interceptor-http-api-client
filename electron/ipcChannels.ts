@@ -1,0 +1,16 @@
+export const IPC_CHANNELS = {
+  WINDOW_IS_MAXIMIZED: 'window:isMaximized',
+  WINDOW_STATE_CHANGED: 'window:state-changed',
+  HTTP_EXECUTE: 'http:execute',
+  HTTP_CANCEL: 'http:cancel',
+  DIALOG_OPEN_FILE: 'dialog:openFile',
+  DIALOG_SAVE_FILE: 'dialog:saveFile',
+  MOCK_SERVER_START: 'mock-server:start',
+  MOCK_SERVER_STOP: 'mock-server:stop',
+  MOCK_SERVER_STOP_ALL: 'mock-server:stop-all',
+  MOCK_SERVER_GET_STORE: 'mock-server:get-store',
+  MOCK_SERVER_CLEAR_STORE: 'mock-server:clear-store',
+  MOCK_SERVER_SET_STORE: 'mock-server:set-store',
+  MOCK_SERVER_REQUEST_LOG: 'mock-server:request-log',
+  MOCK_SERVER_STATUS_CHANGE: 'mock-server:status-change',
+} as const;

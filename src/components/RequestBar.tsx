@@ -1,15 +1,11 @@
-import React, { useRef, useState, useEffect } from 'react';
-import { HttpMethod, Environment } from '../types';
+import React, { useRef } from 'react';
+import { Environment, HttpMethod } from '../types';
 import { isCurlCommand, parseCurlCommand, ParsedCurlResult } from '../utils/curlParser';
-import {
-  extractVariablesFromText,
-  findVariableAtCharIndex,
-  resolveVariableInfo,
-  VariableResolutionInfo,
-} from '../utils/variables';
+import { extractVariablesFromText, resolveVariableInfo } from '../utils/variables';
+import { useVariableHover } from '../hooks/useVariableHover';
 import { VariableHoverTooltip } from './VariableHoverTooltip';
 import { HttpMethodDropdown } from './HttpMethodDropdown';
-import { Save, Code2 } from 'lucide-react';
+import { Code2, Save } from 'lucide-react';
 
 interface RequestBarProps {
   method: HttpMethod;
@@ -44,57 +40,24 @@ export const RequestBar: React.FC<RequestBarProps> = ({
   isLoading,
   isDirty,
 }) => {
-  const isMac = typeof window !== 'undefined' && navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+  const isMac =
+    typeof window !== 'undefined' && navigator.platform.toUpperCase().indexOf('MAC') >= 0;
   const saveShortcut = isMac ? '⌘S' : 'Ctrl+S';
 
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const backdropRef = useRef<HTMLDivElement>(null);
-  const charWidthRef = useRef<number>(0);
-  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const [hoveredVar, setHoveredVar] = useState<{
-    info: VariableResolutionInfo;
-    x: number;
-    y: number;
-  } | null>(null);
-
-  // Clear hover timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
-    };
-  }, []);
+  const {
+    hoveredVar,
+    clearHoveredVar,
+    handleSingleLineMouseMove,
+    handleMouseLeave,
+    handleTooltipMouseEnter,
+    handleTooltipMouseLeave,
+  } = useVariableHover({ activeEnvironment, environments, defaultPaddingLeft: 4 });
 
   const variablesInUrl = extractVariablesFromText(url);
-
-  // Measure character width for monospace input
-  const getCharWidth = (inputEl: HTMLInputElement): number => {
-    if (charWidthRef.current > 0) return charWidthRef.current;
-    try {
-      const style = window.getComputedStyle(inputEl);
-      const span = document.createElement('span');
-      span.style.font = style.font;
-      span.style.fontFamily = style.fontFamily;
-      span.style.fontSize = style.fontSize;
-      span.style.fontWeight = style.fontWeight;
-      span.style.letterSpacing = style.letterSpacing;
-      span.style.visibility = 'hidden';
-      span.style.position = 'absolute';
-      span.style.whiteSpace = 'pre';
-      span.textContent = 'M'.repeat(100);
-      document.body.appendChild(span);
-      const width = span.getBoundingClientRect().width / 100;
-      document.body.removeChild(span);
-      if (width > 0) {
-        charWidthRef.current = width;
-        return width;
-      }
-    } catch {
-      // fallback
-    }
-    return 7.2;
-  };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey || !isLoading)) {
@@ -119,15 +82,13 @@ export const RequestBar: React.FC<RequestBarProps> = ({
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setHoveredVar(null);
+    clearHoveredVar();
     const val = e.target.value;
     if (isCurlCommand(val)) {
       const parsed = parseCurlCommand(val);
-      if (parsed) {
-        if (onImportCurl) {
-          onImportCurl(parsed);
-          return;
-        }
+      if (parsed && onImportCurl) {
+        onImportCurl(parsed);
+        return;
       }
     }
     onUrlChange(val);
@@ -137,63 +98,6 @@ export const RequestBar: React.FC<RequestBarProps> = ({
     if (backdropRef.current && inputRef.current) {
       backdropRef.current.scrollLeft = inputRef.current.scrollLeft;
     }
-  };
-
-  const handleMouseMove = (e: React.MouseEvent<HTMLInputElement>) => {
-    if (!inputRef.current) return;
-    const input = inputRef.current;
-    const rect = input.getBoundingClientRect();
-    const style = window.getComputedStyle(input);
-    const paddingLeft = parseFloat(style.paddingLeft) || 4;
-
-    const charWidth = getCharWidth(input);
-    if (charWidth <= 0) return;
-
-    const mouseX = e.clientX - rect.left - paddingLeft + input.scrollLeft;
-    if (mouseX < 0) {
-      if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
-      hoverTimeoutRef.current = setTimeout(() => setHoveredVar(null), 100);
-      return;
-    }
-
-    const charIndex = Math.floor(mouseX / charWidth);
-    const matched = findVariableAtCharIndex(url, charIndex);
-
-    if (matched) {
-      if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
-      const info = resolveVariableInfo(matched.varName, activeEnvironment, environments);
-      const varStartPx = rect.left + paddingLeft + (matched.startIndex * charWidth) - input.scrollLeft;
-      const varWidthPx = (matched.endIndex - matched.startIndex) * charWidth;
-      const x = varStartPx + varWidthPx / 2;
-      const y = rect.bottom + 6;
-
-      setHoveredVar({
-        info,
-        x,
-        y,
-      });
-    } else {
-      if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
-      hoverTimeoutRef.current = setTimeout(() => {
-        setHoveredVar(null);
-      }, 120);
-    }
-  };
-
-  const handleMouseLeave = () => {
-    if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
-    hoverTimeoutRef.current = setTimeout(() => {
-      setHoveredVar(null);
-    }, 180);
-  };
-
-  const handleTooltipMouseEnter = () => {
-    if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
-  };
-
-  const handleTooltipMouseLeave = () => {
-    if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
-    setHoveredVar(null);
   };
 
   const renderBackdropContent = () => {
@@ -217,9 +121,7 @@ export const RequestBar: React.FC<RequestBarProps> = ({
       elements.push(
         <span
           key={`var-${v.startIndex}-${idx}`}
-          className={`font-semibold ${
-            info.isResolved ? 'text-emerald-400' : 'text-rose-400'
-          }`}
+          className={`font-semibold ${info.isResolved ? 'text-emerald-400' : 'text-rose-400'}`}
         >
           {v.fullMatch}
         </span>
@@ -240,12 +142,10 @@ export const RequestBar: React.FC<RequestBarProps> = ({
 
   return (
     <div className="flex items-center gap-2 px-4 pt-3 pb-2 bg-[#1a1a1a] w-full relative select-none">
-      {/* Bruno-Style Integrated URL Input Box (QueryUrl) */}
       <div
         ref={containerRef}
         className="flex-1 relative flex items-center bg-[#1a1a1a] border border-[#333333] rounded-md px-3 h-[34px] focus-within:border-[#444444] transition-colors"
       >
-        {/* Method Label Button (Directly inside on the left, no borders, no chevron) */}
         <HttpMethodDropdown
           variant="bare"
           method={method}
@@ -254,7 +154,6 @@ export const RequestBar: React.FC<RequestBarProps> = ({
           className="mr-2.5"
         />
 
-        {/* URL Input with Variable Highlighting */}
         <div className="flex-1 relative flex items-center overflow-hidden h-full">
           <div
             ref={backdropRef}
@@ -271,19 +170,19 @@ export const RequestBar: React.FC<RequestBarProps> = ({
             onChange={handleInputChange}
             onPaste={handlePaste}
             onKeyDown={handleKeyDown}
-            onMouseMove={handleMouseMove}
+            onMouseMove={(e) => handleSingleLineMouseMove(e, url)}
             onMouseLeave={handleMouseLeave}
             onScroll={handleScroll}
             placeholder="Enter URL or paste a cURL request"
             className={`w-full bg-transparent pl-0.5 pr-16 text-xs font-mono outline-none z-10 ${
-              variablesInUrl.length > 0 ? 'text-transparent caret-white' : 'text-[#ffffff] placeholder:text-[#666666]'
+              variablesInUrl.length > 0
+                ? 'text-transparent caret-white'
+                : 'text-[#ffffff] placeholder:text-[#666666]'
             }`}
           />
         </div>
 
-        {/* Action Buttons Inside URL Input Box: Code Generator & Save */}
         <div className="flex items-center gap-2 shrink-0 ml-1.5 z-20">
-          {/* Code Snippet Button (</>) */}
           <button
             type="button"
             onClick={onOpenCodeSnippet}
@@ -293,7 +192,6 @@ export const RequestBar: React.FC<RequestBarProps> = ({
             <Code2 className="w-3.5 h-3.5" />
           </button>
 
-          {/* Save Button (Floppy disk icon) */}
           <button
             type="button"
             onClick={onSave}
@@ -302,7 +200,11 @@ export const RequestBar: React.FC<RequestBarProps> = ({
                 ? 'text-[#d99b26] hover:text-[#e5a730]'
                 : 'text-[#999999] hover:text-[#cccccc] hover:bg-[#26292b]'
             }`}
-            title={isDirty ? `Save Request (${saveShortcut}) • Unsaved changes` : `Save Request (${saveShortcut})`}
+            title={
+              isDirty
+                ? `Save Request (${saveShortcut}) • Unsaved changes`
+                : `Save Request (${saveShortcut})`
+            }
           >
             <Save className="w-3.5 h-3.5" />
             {isDirty && (
@@ -312,7 +214,6 @@ export const RequestBar: React.FC<RequestBarProps> = ({
         </div>
       </div>
 
-      {/* Send or Cancel Button (Outside Input Box) */}
       {isLoading ? (
         <button
           type="button"
@@ -331,7 +232,6 @@ export const RequestBar: React.FC<RequestBarProps> = ({
         </button>
       )}
 
-      {/* Variable Hover Tooltip */}
       {hoveredVar && (
         <VariableHoverTooltip
           info={hoveredVar.info}

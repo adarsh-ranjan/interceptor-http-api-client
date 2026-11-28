@@ -1,19 +1,11 @@
-import React, { useState, useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { HttpResponse } from '../types';
-import { formatBytes, formatDuration, getStatusColor } from '../utils/http';
+import { saveTextFile } from '../services/fileService';
+import { useClipboard } from '../hooks/useClipboard';
+import { formatBytes, formatDuration } from '../utils/http';
+import { formatJsonString, isValidJsonString } from '../utils/jsonTokenizer';
 import { JsonSyntaxViewer } from './JsonSyntaxViewer';
-import {
-  Copy,
-  Check,
-  Clock,
-  Database,
-  Globe,
-  Search,
-  AlertTriangle,
-  CheckCircle2,
-  XCircle,
-  Download,
-} from 'lucide-react';
+import { AlertTriangle, Check, CheckCircle2, Copy, Download, XCircle } from 'lucide-react';
 
 interface ResponseViewerProps {
   response: HttpResponse | null;
@@ -67,16 +59,22 @@ class JsonErrorBoundary extends React.Component<
   }
 }
 
+function getSerializedResponseBody(response: HttpResponse): string {
+  if (response.isJson && response.data !== undefined) {
+    return formatJsonString(response.data, response.rawBody);
+  }
+  return response.rawBody || '';
+}
+
 export const ResponseViewer: React.FC<ResponseViewerProps> = ({
   response,
   isLoading,
   activeUrl,
 }) => {
   const [viewTab, setViewTab] = useState<'pretty' | 'raw' | 'preview' | 'headers' | 'tests'>('pretty');
-  const [headerFilter, setHeaderFilter] = useState('');
-  const [copied, setCopied] = useState(false);
+  const [headerFilter] = useState('');
+  const { copied, copy } = useClipboard(2000);
 
-  // React Rules of Hooks: Must define hooks at top-level before any conditional early returns
   const isJson = useMemo(() => {
     if (!response) return false;
     if (response.isJson) return true;
@@ -87,70 +85,27 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({
         (trimmed.startsWith('{') && trimmed.endsWith('}')) ||
         (trimmed.startsWith('[') && trimmed.endsWith(']'))
       ) {
-        try {
-          JSON.parse(trimmed);
-          return true;
-        } catch {
-          return false;
-        }
+        return isValidJsonString(trimmed);
       }
-    }
-    return false;
-  }, [response]);
-
-  const isHtml = useMemo(() => {
-    if (!response) return false;
-    if (response.contentType?.toLowerCase().includes('text/html')) return true;
-    if (response.rawBody) {
-      const lower = response.rawBody.trim().toLowerCase();
-      return lower.startsWith('<!doctype html') || lower.startsWith('<html');
     }
     return false;
   }, [response]);
 
   const handleCopy = () => {
     if (!response) return;
-    let content = response.rawBody || '';
-    if (response.isJson && response.data !== undefined) {
-      try {
-        content = JSON.stringify(response.data, null, 2);
-      } catch {
-        content = response.rawBody || '';
-      }
-    }
-    navigator.clipboard.writeText(content);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    copy(getSerializedResponseBody(response));
   };
 
   const handleSaveResponse = async () => {
     if (!response) return;
-    let content = response.rawBody || '';
-    if (response.isJson && response.data !== undefined) {
-      try {
-        content = JSON.stringify(response.data, null, 2);
-      } catch {
-        content = response.rawBody || '';
-      }
-    }
+    const content = getSerializedResponseBody(response);
     const ext = response.isJson ? 'json' : 'txt';
-    const fileName = `response_${Date.now()}.${ext}`;
-
-    if (window.interceptor?.saveFileDialog) {
-      await window.interceptor.saveFileDialog({
-        defaultPath: fileName,
-        content,
-        filters: [{ name: ext.toUpperCase(), extensions: [ext] }],
-      });
-    } else {
-      const blob = new Blob([content], { type: 'text/plain' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = fileName;
-      a.click();
-      URL.revokeObjectURL(url);
-    }
+    await saveTextFile({
+      defaultPath: `response_${Date.now()}.${ext}`,
+      content,
+      filters: [{ name: ext.toUpperCase(), extensions: [ext] }],
+      mimeType: 'text/plain',
+    });
   };
 
   if (isLoading) {
@@ -171,7 +126,6 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({
   if (!response) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-[#888888] bg-[#1a1a1a] p-8 select-none">
-        {/* Bruno Signature Paper Airplane Watermark */}
         <div className="text-[#333333] mb-6 flex justify-center">
           <svg
             className="w-24 h-24 stroke-[#383a42] fill-none"
@@ -185,7 +139,6 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({
           </svg>
         </div>
 
-        {/* Keyboard Shortcuts List (Matching Bruno Response Placeholder) */}
         <div className="flex text-xs">
           <div className="flex flex-col items-end pr-4 space-y-1.5 text-[#888888]">
             <div>Send Request</div>
@@ -202,11 +155,11 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({
     );
   }
 
-  const statusColor = getStatusColor(response.status);
   const headerKeys = Object.keys(response.headers || {});
-  const filteredHeaderKeys = headerKeys.filter((k) =>
-    k.toLowerCase().includes(headerFilter.toLowerCase()) ||
-    String(response.headers[k]).toLowerCase().includes(headerFilter.toLowerCase())
+  const filteredHeaderKeys = headerKeys.filter(
+    (k) =>
+      k.toLowerCase().includes(headerFilter.toLowerCase()) ||
+      String(response.headers[k]).toLowerCase().includes(headerFilter.toLowerCase())
   );
 
   const testResults = response.testResults || [];
@@ -214,9 +167,7 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({
 
   return (
     <div className="flex flex-col h-full bg-[#1a1a1a] text-xs">
-      {/* Response Bar (Bruno-Style integrated tabs + metadata row) */}
       <div className="flex items-center justify-between px-3 border-b border-[#333333] bg-[#1a1a1a] select-none gap-2 shrink-0">
-        {/* Subtabs on left */}
         <div className="flex items-center gap-1">
           <button
             onClick={() => setViewTab('pretty')}
@@ -266,22 +217,25 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({
               }`}
             >
               <span>Tests</span>
-              <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono font-medium ${
-                passedTestsCount === testResults.length
-                  ? 'bg-emerald-500/15 text-emerald-400'
-                  : 'bg-rose-500/15 text-rose-400'
-              }`}>
+              <span
+                className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono font-medium ${
+                  passedTestsCount === testResults.length
+                    ? 'bg-emerald-500/15 text-emerald-400'
+                    : 'bg-rose-500/15 text-rose-400'
+                }`}
+              >
                 {passedTestsCount}/{testResults.length}
               </span>
             </button>
           )}
         </div>
 
-        {/* Right side metadata & actions (Bruno Status, Duration, Size) */}
         <div className="flex items-center gap-3">
           {response.status > 0 ? (
             <div className="flex items-center gap-2 font-mono text-xs">
-              <span className="font-bold text-emerald-400">{response.status} {response.statusText}</span>
+              <span className="font-bold text-emerald-400">
+                {response.status} {response.statusText}
+              </span>
               <span className="text-[#666666]">•</span>
               <span className="text-[#999999]">{formatDuration(response.timeMs)}</span>
               <span className="text-[#666666]">•</span>
@@ -296,7 +250,6 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({
 
           <div className="w-px h-3.5 bg-[#333333]" />
 
-          {/* Actions: Save & Copy */}
           <div className="flex items-center gap-1">
             <button
               onClick={handleSaveResponse}
@@ -321,16 +274,11 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({
         </div>
       </div>
 
-      {/* Response Tab Content */}
       <div className="flex-1 overflow-hidden flex flex-col">
-        {viewTab === 'pretty' && (
-          isJson ? (
+        {viewTab === 'pretty' &&
+          (isJson ? (
             <JsonErrorBoundary fallbackRaw={response.rawBody}>
-              <JsonSyntaxViewer
-                data={response.data}
-                rawText={response.rawBody}
-                onCopy={handleCopy}
-              />
+              <JsonSyntaxViewer data={response.data} rawText={response.rawBody} onCopy={handleCopy} />
             </JsonErrorBoundary>
           ) : (
             <div className="flex-1 overflow-auto p-3">
@@ -338,8 +286,7 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({
                 {response.rawBody || <span className="text-slate-500">Empty response body</span>}
               </pre>
             </div>
-          )
-        )}
+          ))}
 
         {viewTab === 'raw' && (
           <div className="flex-1 overflow-auto p-3">
@@ -363,78 +310,76 @@ export const ResponseViewer: React.FC<ResponseViewerProps> = ({
         {viewTab === 'headers' && (
           <div className="flex-1 overflow-auto p-3">
             <div className="border border-[#333333] rounded overflow-hidden">
-            <table className="w-full text-left font-mono text-[11px]">
-              <thead className="bg-[#222224] text-[#888888] border-b border-[#333333]">
-                <tr>
-                  <th className="py-1.5 px-3 font-semibold w-1/3">Header</th>
-                  <th className="py-1.5 px-3 font-semibold">Value</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#333333] bg-[#1a1a1a]">
-                {filteredHeaderKeys.length === 0 ? (
+              <table className="w-full text-left font-mono text-[11px]">
+                <thead className="bg-[#222224] text-[#888888] border-b border-[#333333]">
                   <tr>
-                    <td colSpan={2} className="py-4 text-center text-[#666666]">
-                      No matching headers
-                    </td>
+                    <th className="py-1.5 px-3 font-semibold w-1/3">Header</th>
+                    <th className="py-1.5 px-3 font-semibold">Value</th>
                   </tr>
-                ) : (
-                  filteredHeaderKeys.map((key) => (
-                    <tr key={key} className="hover:bg-[#222224] transition-colors">
-                      <td className="py-1.5 px-3 text-[#cccccc] font-medium select-text break-all">
-                        {key}
-                      </td>
-                      <td className="py-1.5 px-3 text-[#999999] select-text break-all">
-                        {response.headers[key]}
+                </thead>
+                <tbody className="divide-y divide-[#333333] bg-[#1a1a1a]">
+                  {filteredHeaderKeys.length === 0 ? (
+                    <tr>
+                      <td colSpan={2} className="py-4 text-center text-[#666666]">
+                        No matching headers
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {viewTab === 'tests' && (
-        <div className="flex-1 overflow-auto p-3">
-          <div className="space-y-2">
-            <div className="flex items-center justify-between pb-2 border-b border-[#333333]">
-              <span className="font-semibold text-[#cccccc]">
-                Assertion Breakdown
-              </span>
-              <span className="text-[#888888]">
-                {passedTestsCount} passed, {testResults.length - passedTestsCount} failed
-              </span>
-            </div>
-
-            {testResults.map((result) => (
-              <div
-                key={result.id}
-                className={`p-2.5 rounded-md border flex items-start gap-2.5 ${
-                  result.passed
-                    ? 'bg-emerald-500/5 border-emerald-500/20 text-emerald-300'
-                    : 'bg-rose-500/5 border-rose-500/20 text-rose-300'
-                }`}
-              >
-                {result.passed ? (
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-                ) : (
-                  <XCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
-                )}
-
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-slate-200">{result.name}</p>
-                  {result.error && (
-                    <p className="text-[11px] font-mono text-rose-400 mt-1 whitespace-pre-wrap">
-                      {result.error}
-                    </p>
+                  ) : (
+                    filteredHeaderKeys.map((key) => (
+                      <tr key={key} className="hover:bg-[#222224] transition-colors">
+                        <td className="py-1.5 px-3 text-[#cccccc] font-medium select-text break-all">
+                          {key}
+                        </td>
+                        <td className="py-1.5 px-3 text-[#999999] select-text break-all">
+                          {response.headers[key]}
+                        </td>
+                      </tr>
+                    ))
                   )}
-                </div>
-              </div>
-            ))}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+
+        {viewTab === 'tests' && (
+          <div className="flex-1 overflow-auto p-3">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between pb-2 border-b border-[#333333]">
+                <span className="font-semibold text-[#cccccc]">Assertion Breakdown</span>
+                <span className="text-[#888888]">
+                  {passedTestsCount} passed, {testResults.length - passedTestsCount} failed
+                </span>
+              </div>
+
+              {testResults.map((result) => (
+                <div
+                  key={result.id}
+                  className={`p-2.5 rounded-md border flex items-start gap-2.5 ${
+                    result.passed
+                      ? 'bg-emerald-500/5 border-emerald-500/20 text-emerald-300'
+                      : 'bg-rose-500/5 border-rose-500/20 text-rose-300'
+                  }`}
+                >
+                  {result.passed ? (
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                  ) : (
+                    <XCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+                  )}
+
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-slate-200">{result.name}</p>
+                    {result.error && (
+                      <p className="text-[11px] font-mono text-rose-400 mt-1 whitespace-pre-wrap">
+                        {result.error}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

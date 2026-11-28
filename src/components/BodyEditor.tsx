@@ -1,14 +1,11 @@
-import React, { useRef, useState, useEffect } from 'react';
-import { BodyType, FormDataItem, KeyValuePair, Environment } from '../types';
+import React from 'react';
+import { BodyType, Environment, FormDataItem, KeyValuePair } from '../types';
+import { pickBinaryFile } from '../services/fileService';
+import { useVariableHover } from '../hooks/useVariableHover';
 import { FileUp, Trash2 } from 'lucide-react';
 import { JsonBodyEditor } from './JsonBodyEditor';
 import { KeyValueEditor } from './KeyValueEditor';
 import { VariableHoverTooltip } from './VariableHoverTooltip';
-import {
-  findVariableInMultilineText,
-  resolveVariableInfo,
-  VariableResolutionInfo,
-} from '../utils/variables';
 
 interface BodyEditorProps {
   bodyType: BodyType;
@@ -29,7 +26,6 @@ interface BodyEditorProps {
 
 export const BodyEditor: React.FC<BodyEditorProps> = ({
   bodyType,
-  onBodyTypeChange,
   bodyContent,
   onBodyContentChange,
   formData = [],
@@ -43,86 +39,29 @@ export const BodyEditor: React.FC<BodyEditorProps> = ({
   environments,
   onOpenEnvironmentModal,
 }) => {
-  const rawTextareaRef = useRef<HTMLTextAreaElement>(null);
-  const rawHoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const [hoveredRawVar, setHoveredRawVar] = useState<{
-    info: VariableResolutionInfo;
-    x: number;
-    y: number;
-  } | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (rawHoverTimeoutRef.current) clearTimeout(rawHoverTimeoutRef.current);
-    };
-  }, []);
-
-  const handleRawMouseMove = (e: React.MouseEvent<HTMLTextAreaElement>) => {
-    if (!rawTextareaRef.current || !bodyContent) return;
-    const textarea = rawTextareaRef.current;
-    const rect = textarea.getBoundingClientRect();
-    const style = window.getComputedStyle(textarea);
-    const paddingLeft = parseFloat(style.paddingLeft) || 12;
-    const paddingTop = parseFloat(style.paddingTop) || 12;
-    const lineHeight = parseFloat(style.lineHeight) || 18;
-    const charWidth = 7.2;
-
-    const mouseX = e.clientX - rect.left - paddingLeft + textarea.scrollLeft;
-    const mouseY = e.clientY - rect.top - paddingTop + textarea.scrollTop;
-
-    if (mouseX < 0 || mouseY < 0) {
-      if (rawHoverTimeoutRef.current) clearTimeout(rawHoverTimeoutRef.current);
-      rawHoverTimeoutRef.current = setTimeout(() => setHoveredRawVar(null), 100);
-      return;
-    }
-
-    const lineIndex = Math.floor(mouseY / lineHeight);
-    const charInLine = Math.floor(mouseX / charWidth);
-
-    const matched = findVariableInMultilineText(bodyContent, lineIndex, charInLine);
-    if (matched) {
-      if (rawHoverTimeoutRef.current) clearTimeout(rawHoverTimeoutRef.current);
-      const info = resolveVariableInfo(matched.varName, activeEnvironment, environments);
-      setHoveredRawVar({
-        info,
-        x: Math.min(window.innerWidth - 340, Math.max(16, e.clientX - 100)),
-        y: Math.min(window.innerHeight - 180, e.clientY + 14),
-      });
-    } else {
-      if (rawHoverTimeoutRef.current) clearTimeout(rawHoverTimeoutRef.current);
-      rawHoverTimeoutRef.current = setTimeout(() => {
-        setHoveredRawVar(null);
-      }, 120);
-    }
-  };
-
-  const handleRawMouseLeave = () => {
-    if (rawHoverTimeoutRef.current) clearTimeout(rawHoverTimeoutRef.current);
-    rawHoverTimeoutRef.current = setTimeout(() => {
-      setHoveredRawVar(null);
-    }, 180);
-  };
+  const {
+    hoveredVar,
+    clearHoveredVar,
+    handleMultilineMouseMove,
+    handleMouseLeave,
+    handleTooltipMouseEnter,
+    handleTooltipMouseLeave,
+  } = useVariableHover({
+    activeEnvironment,
+    environments,
+    defaultPaddingLeft: 12,
+    defaultPaddingTop: 12,
+    defaultLineHeight: 18,
+    measureCharWidth: false,
+  });
 
   const handlePickBinaryFile = async () => {
-    if (window.interceptor?.openFileDialog) {
-      const res = await window.interceptor.openFileDialog();
-      if (res && res.filePath) {
-        onBinaryFileChange(res.filePath, res.fileName);
-      }
-    } else {
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.onchange = (e) => {
-        const file = (e.target as HTMLInputElement).files?.[0];
-        if (file) {
-          onBinaryFileChange((file as any).path || file.name, file.name);
-        }
-      };
-      input.click();
+    const picked = await pickBinaryFile();
+    if (picked) {
+      onBinaryFileChange(picked.filePath, picked.fileName);
     }
   };
 
-  // Convert FormDataItems <-> KeyValuePairs for KeyValueEditor
   const formDataAsKeyValues: KeyValuePair[] = formData.map((f) => ({
     id: f.id,
     key: f.key,
@@ -149,14 +88,10 @@ export const BodyEditor: React.FC<BodyEditorProps> = ({
 
   return (
     <div className="flex-1 flex flex-col h-full bg-[#1a1a1a] text-xs overflow-hidden">
-      {/* NO BODY (matches Bruno Image 5) */}
       {bodyType === 'none' && (
-        <div className="p-4 text-xs text-[#888888] select-none">
-          No Body
-        </div>
+        <div className="p-4 text-xs text-[#888888] select-none">No Body</div>
       )}
 
-      {/* JSON BODY EDITOR (matches Bruno Image 6) */}
       {bodyType === 'json' && (
         <JsonBodyEditor
           value={bodyContent}
@@ -168,41 +103,33 @@ export const BodyEditor: React.FC<BodyEditorProps> = ({
         />
       )}
 
-      {/* RAW TEXT */}
       {bodyType === 'text' && (
         <div className="relative w-full h-full">
           <textarea
-            ref={rawTextareaRef}
             value={bodyContent}
             onChange={(e) => {
-              setHoveredRawVar(null);
+              clearHoveredVar();
               onBodyContentChange(e.target.value);
             }}
-            onMouseMove={handleRawMouseMove}
-            onMouseLeave={handleRawMouseLeave}
+            onMouseMove={(e) => handleMultilineMouseMove(e, bodyContent)}
+            onMouseLeave={handleMouseLeave}
             placeholder="Enter raw text payload..."
             spellCheck={false}
             className="w-full h-full p-4 font-mono text-xs bg-transparent text-[#cccccc] resize-none focus:outline-none leading-relaxed selection:bg-[#d99b26]/30 caret-[#d99b26]"
           />
-          {hoveredRawVar && (
+          {hoveredVar && (
             <VariableHoverTooltip
-              info={hoveredRawVar.info}
-              x={hoveredRawVar.x}
-              y={hoveredRawVar.y}
-              onMouseEnter={() => {
-                if (rawHoverTimeoutRef.current) clearTimeout(rawHoverTimeoutRef.current);
-              }}
-              onMouseLeave={() => {
-                if (rawHoverTimeoutRef.current) clearTimeout(rawHoverTimeoutRef.current);
-                setHoveredRawVar(null);
-              }}
+              info={hoveredVar.info}
+              x={hoveredVar.x}
+              y={hoveredVar.y}
+              onMouseEnter={handleTooltipMouseEnter}
+              onMouseLeave={handleTooltipMouseLeave}
               onOpenEnvModal={onOpenEnvironmentModal}
             />
           )}
         </div>
       )}
 
-      {/* MULTIPART FORM-DATA (Bruno EditableTable) */}
       {bodyType === 'form-data' && (
         <KeyValueEditor
           items={formDataAsKeyValues}
@@ -218,7 +145,6 @@ export const BodyEditor: React.FC<BodyEditorProps> = ({
         />
       )}
 
-      {/* URLENCODED (Bruno EditableTable) */}
       {bodyType === 'urlencoded' && (
         <KeyValueEditor
           items={urlEncoded}
@@ -234,13 +160,14 @@ export const BodyEditor: React.FC<BodyEditorProps> = ({
         />
       )}
 
-      {/* BINARY FILE */}
       {bodyType === 'binary' && (
         <div className="flex flex-col items-start p-6 text-xs space-y-4">
           <span className="font-semibold text-xs text-[#888888]">File / Binary</span>
           {binaryFilePath ? (
             <div className="flex items-center gap-3 bg-[#222224] border border-[#333333] rounded px-3 py-2">
-              <span className="font-mono text-xs text-[#cccccc]">{binaryFileName || binaryFilePath}</span>
+              <span className="font-mono text-xs text-[#cccccc]">
+                {binaryFileName || binaryFilePath}
+              </span>
               <button
                 type="button"
                 onClick={() => onBinaryFileChange(undefined, undefined)}

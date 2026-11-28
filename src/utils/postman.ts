@@ -7,21 +7,13 @@ import type {
   BodyType,
   AuthConfig,
   FormDataItem,
-} from '../types/index.ts';
+} from '../types/index';
+import { generateId, generateUuidV4 } from './id';
 
 /**
  * Generates an RFC 4122 v4 compliant UUID
  */
-export function generateUUID(): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID();
-  }
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    const v = c === 'x' ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
-}
+export const generateUUID = generateUuidV4;
 
 /**
  * Validates or converts an ID to a UUID v4
@@ -460,7 +452,7 @@ export function parseCollectionFile(rawContent: string): Collection {
     // If it has children items, treat as folder
     if (Array.isArray(item.item)) {
       return {
-        id: item.id || `folder-${Math.random().toString(36).substring(2, 9)}`,
+        id: item.id || generateId('folder'),
         name: item.name || 'Unnamed Folder',
         type: 'folder',
         children: item.item.map(convertPostmanItem),
@@ -482,7 +474,7 @@ export function parseCollectionFile(rawContent: string): Collection {
       if (Array.isArray(postmanReq.url.query)) {
         postmanReq.url.query.forEach((q: any) => {
           params.push({
-            id: `param-${Math.random().toString(36).substring(2, 9)}`,
+            id: generateId('param'),
             key: q.key || '',
             value: q.value || '',
             enabled: q.disabled !== true,
@@ -497,7 +489,7 @@ export function parseCollectionFile(rawContent: string): Collection {
     if (Array.isArray(postmanReq.header)) {
       postmanReq.header.forEach((h: any) => {
         headers.push({
-          id: `header-${Math.random().toString(36).substring(2, 9)}`,
+          id: generateId('header'),
           key: h.key || '',
           value: h.value || '',
           enabled: h.disabled !== true,
@@ -571,7 +563,7 @@ export function parseCollectionFile(rawContent: string): Collection {
         bodyType = 'form-data';
         postmanReq.body.formdata.forEach((f: any) => {
           formData.push({
-            id: `fd-${Math.random().toString(36).substring(2, 9)}`,
+            id: generateId('fd'),
             key: f.key || '',
             value: f.type === 'text' ? f.value || '' : '',
             type: f.type === 'file' ? 'file' : 'text',
@@ -584,7 +576,7 @@ export function parseCollectionFile(rawContent: string): Collection {
         bodyType = 'urlencoded';
         postmanReq.body.urlencoded.forEach((u: any) => {
           urlEncoded.push({
-            id: `ue-${Math.random().toString(36).substring(2, 9)}`,
+            id: generateId('ue'),
             key: u.key || '',
             value: u.value || '',
             enabled: u.disabled !== true,
@@ -611,7 +603,7 @@ export function parseCollectionFile(rawContent: string): Collection {
     }
 
     const req: HttpRequest = {
-      id: `req-${Math.random().toString(36).substring(2, 9)}`,
+      id: generateId('req'),
       name: item.name || 'Unnamed Request',
       method,
       url: rawUrl,
@@ -628,7 +620,7 @@ export function parseCollectionFile(rawContent: string): Collection {
     };
 
     return {
-      id: item.id || `item-${Math.random().toString(36).substring(2, 9)}`,
+      id: item.id || generateId('item'),
       name: item.name || 'Unnamed Request',
       type: 'request',
       request: req,

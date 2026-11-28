@@ -1,4 +1,5 @@
 import { MockServer, MockRoute } from '../types/server';
+import { getStorageJson, setStorageJson } from './storage';
 
 export const DEFAULT_MOCK_ROUTES: MockRoute[] = [
   {
@@ -145,28 +146,18 @@ export const DEFAULT_MOCK_SERVERS: MockServer[] = [
 const STORAGE_KEY = 'interceptor_mock_servers';
 
 export function loadMockServers(): MockServer[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return DEFAULT_MOCK_SERVERS;
-    const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed) && parsed.length > 0) {
-      // Ensure all servers start with 'stopped' status upon initial load
-      return parsed.map((s: MockServer) => ({
-        ...s,
-        status: 'stopped' as const,
-        errorMessage: undefined,
-      }));
-    }
-  } catch (e) {
-    console.error('Failed to load mock servers from storage', e);
+  const parsed = getStorageJson<MockServer[] | null>(STORAGE_KEY, null);
+  if (Array.isArray(parsed) && parsed.length > 0) {
+    // Ensure all servers start with 'stopped' status upon initial load
+    return parsed.map((s) => ({
+      ...s,
+      status: 'stopped' as const,
+      errorMessage: undefined,
+    }));
   }
   return DEFAULT_MOCK_SERVERS;
 }
 
 export function saveMockServers(servers: MockServer[]): void {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(servers));
-  } catch (e) {
-    console.error('Failed to save mock servers to storage', e);
-  }
+  setStorageJson(STORAGE_KEY, servers);
 }

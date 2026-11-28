@@ -1,8 +1,9 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { createPortal } from 'react-dom';
-import { TabItem, RequestProtocol } from '../types';
+import React, { useRef, useState } from 'react';
+import { RequestProtocol, TabItem } from '../types';
 import { getMethodColor } from '../utils/http';
-import { Plus, X, Globe, Radio, ChevronDown, Box } from 'lucide-react';
+import { useTabScroll } from '../hooks/useTabScroll';
+import { ChevronDown, ChevronLeft, ChevronRight, Globe, Plus, Radio, X } from 'lucide-react';
+import { PortalMenu } from './PortalMenu';
 
 interface RequestTabsProps {
   tabs: TabItem[];
@@ -19,12 +20,20 @@ export const RequestTabs: React.FC<RequestTabsProps> = ({
   onSelectTab,
   onCloseTab,
   onNewTab,
-  activeCollectionName,
 }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const {
+    scrollContainerRef,
+    canScrollLeft,
+    canScrollRight,
+    isOverflowing,
+    updateScrollState,
+    scrollTabs,
+    handleWheel,
+  } = useTabScroll({ activeTabId, itemCount: tabs.length });
 
   const toggleMenu = () => {
     if (isMenuOpen) {
@@ -33,7 +42,7 @@ export const RequestTabs: React.FC<RequestTabsProps> = ({
     }
     if (buttonRef.current) {
       const rect = buttonRef.current.getBoundingClientRect();
-      const menuWidth = 192; // 12rem / w-48
+      const menuWidth = 192;
       let left = rect.left;
       if (left + menuWidth > window.innerWidth - 8) {
         left = window.innerWidth - menuWidth - 8;
@@ -46,49 +55,35 @@ export const RequestTabs: React.FC<RequestTabsProps> = ({
     }
   };
 
-  useEffect(() => {
-    if (!isMenuOpen) return;
-
-    const handlePointerDown = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      if (dropdownRef.current && dropdownRef.current.contains(target)) {
-        return;
-      }
-      if (buttonRef.current && buttonRef.current.contains(target)) {
-        return;
-      }
-      setIsMenuOpen(false);
-    };
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setIsMenuOpen(false);
-      }
-    };
-
-    const handleScroll = (e: Event) => {
-      if (dropdownRef.current && dropdownRef.current.contains(e.target as Node)) {
-        return;
-      }
-      setIsMenuOpen(false);
-    };
-
-    document.addEventListener('mousedown', handlePointerDown);
-    document.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('scroll', handleScroll, true);
-    window.addEventListener('resize', handleScroll);
-
-    return () => {
-      document.removeEventListener('mousedown', handlePointerDown);
-      document.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('scroll', handleScroll, true);
-      window.removeEventListener('resize', handleScroll);
-    };
-  }, [isMenuOpen]);
-
   return (
-    <div className="flex items-end bg-[#1a1a1a] border-b border-[#333333] h-9 px-4 overflow-x-auto select-none no-scrollbar">
-      <div className="flex items-end h-full gap-1">
+    <div
+      className={`flex items-end bg-[#1a1a1a] border-b border-[#333333] h-9 select-none shrink-0 ${
+        isOverflowing ? 'px-1.5 gap-1' : 'px-4'
+      }`}
+    >
+      {isOverflowing && (
+        <button
+          type="button"
+          onClick={() => scrollTabs('left')}
+          disabled={!canScrollLeft}
+          className={`w-6 h-7 mb-1 flex items-center justify-center rounded shrink-0 transition-colors ${
+            canScrollLeft
+              ? 'text-[#999999] hover:text-white hover:bg-[#26292b] cursor-pointer'
+              : 'text-[#555555] opacity-40 cursor-not-allowed'
+          }`}
+          title="Scroll tabs left"
+          aria-label="Scroll tabs left"
+        >
+          <ChevronLeft className="w-3.5 h-3.5" />
+        </button>
+      )}
+
+      <div
+        ref={scrollContainerRef}
+        onScroll={updateScrollState}
+        onWheel={handleWheel}
+        className="flex items-end h-9 -mb-px gap-1 overflow-x-auto no-scrollbar min-w-0"
+      >
         {tabs.map((tab) => {
           const isActive = tab.id === activeTabId;
           const isWs = tab.protocol === 'websocket';
@@ -97,11 +92,12 @@ export const RequestTabs: React.FC<RequestTabsProps> = ({
           return (
             <div
               key={tab.id}
+              data-tab-id={tab.id}
               onClick={() => onSelectTab(tab.id)}
               className={`group relative flex items-center gap-2 px-3 py-1 text-xs cursor-pointer transition-all max-w-[210px] shrink-0 ${
                 isActive
-                  ? 'bg-[#1a1a1a] border-t border-l border-r border-[#333333] border-b border-[#1a1a1a] -mb-px text-[#ffffff] font-medium z-10 shadow-xs h-[32px] rounded-t-md'
-                  : 'bg-[#26292b] hover:bg-[#2f3235] text-[#999999] hover:text-[#cccccc] h-[28px] mb-1 rounded-md'
+                  ? 'bg-[#1a1a1a] border-t border-l border-r border-[#333333] border-b border-[#1a1a1a] text-[#ffffff] font-medium z-10 shadow-xs h-[33px] rounded-t-md'
+                  : 'bg-[#26292b] hover:bg-[#2f3235] text-[#999999] hover:text-[#cccccc] h-[28px] mb-[5px] rounded-md'
               }`}
             >
               {isWs ? (
@@ -122,7 +118,10 @@ export const RequestTabs: React.FC<RequestTabsProps> = ({
               </span>
 
               {tab.isDirty && (
-                <span className="w-1.5 h-1.5 rounded-full bg-[#d99b26] shrink-0" title="Unsaved changes" />
+                <span
+                  className="w-1.5 h-1.5 rounded-full bg-[#d99b26] shrink-0"
+                  title="Unsaved changes"
+                />
               )}
 
               {tabs.length > 1 && (
@@ -145,7 +144,6 @@ export const RequestTabs: React.FC<RequestTabsProps> = ({
         })}
       </div>
 
-      {/* New Tab Button & Menu Trigger */}
       <div className="flex items-center ml-1 mb-1 shrink-0">
         <button
           type="button"
@@ -170,45 +168,54 @@ export const RequestTabs: React.FC<RequestTabsProps> = ({
         </button>
       </div>
 
-      {/* Floating Dropdown Menu via Portal to prevent overflow clipping */}
-      {isMenuOpen && menuPos && createPortal(
-        <div
-          ref={dropdownRef}
-          style={{
-            position: 'fixed',
-            top: `${menuPos.top}px`,
-            left: `${menuPos.left}px`,
-            zIndex: 9999,
-          }}
-          className="w-48 bg-[#222224] border border-[#333333] rounded-md shadow-2xl py-1 text-xs select-none backdrop-blur-md animate-in fade-in zoom-in-95 duration-100"
-          onClick={(e) => e.stopPropagation()}
+      {isOverflowing && (
+        <button
+          type="button"
+          onClick={() => scrollTabs('right')}
+          disabled={!canScrollRight}
+          className={`w-6 h-7 mb-1 ml-auto flex items-center justify-center rounded shrink-0 transition-colors ${
+            canScrollRight
+              ? 'text-[#999999] hover:text-white hover:bg-[#26292b] cursor-pointer'
+              : 'text-[#555555] opacity-40 cursor-not-allowed'
+          }`}
+          title="Scroll tabs right"
+          aria-label="Scroll tabs right"
         >
-          <button
-            onClick={() => {
-              onNewTab('http');
-              setIsMenuOpen(false);
-            }}
-            className="w-full flex items-center justify-between px-3 py-1.5 text-[#cccccc] hover:bg-[#26292b] hover:text-white text-left transition-colors cursor-pointer"
-          >
-            <div className="flex items-center gap-2">
-              <Globe className="w-3.5 h-3.5 text-[#d99b26]" />
-              <span>HTTP Request</span>
-            </div>
-            <span className="text-[10px] text-[#777777] font-mono">⌘T</span>
-          </button>
-          <button
-            onClick={() => {
-              onNewTab('websocket');
-              setIsMenuOpen(false);
-            }}
-            className="w-full flex items-center gap-2 px-3 py-1.5 text-[#cccccc] hover:bg-[#26292b] hover:text-white text-left transition-colors cursor-pointer"
-          >
-            <Radio className="w-3.5 h-3.5 text-emerald-400" />
-            <span>WebSocket (WSS)</span>
-          </button>
-        </div>,
-        document.body
+          <ChevronRight className="w-3.5 h-3.5" />
+        </button>
       )}
+
+      <PortalMenu
+        isOpen={isMenuOpen}
+        position={menuPos}
+        onClose={() => setIsMenuOpen(false)}
+        triggerRef={buttonRef}
+        className="w-48 bg-[#222224] border border-[#333333] rounded-md shadow-2xl py-1 text-xs select-none backdrop-blur-md animate-in fade-in zoom-in-95 duration-100"
+      >
+        <button
+          onClick={() => {
+            onNewTab('http');
+            setIsMenuOpen(false);
+          }}
+          className="w-full flex items-center justify-between px-3 py-1.5 text-[#cccccc] hover:bg-[#26292b] hover:text-white text-left transition-colors cursor-pointer"
+        >
+          <div className="flex items-center gap-2">
+            <Globe className="w-3.5 h-3.5 text-[#d99b26]" />
+            <span>HTTP Request</span>
+          </div>
+          <span className="text-[10px] text-[#777777] font-mono">⌘T</span>
+        </button>
+        <button
+          onClick={() => {
+            onNewTab('websocket');
+            setIsMenuOpen(false);
+          }}
+          className="w-full flex items-center gap-2 px-3 py-1.5 text-[#cccccc] hover:bg-[#26292b] hover:text-white text-left transition-colors cursor-pointer"
+        >
+          <Radio className="w-3.5 h-3.5 text-emerald-400" />
+          <span>WebSocket (WSS)</span>
+        </button>
+      </PortalMenu>
     </div>
   );
 };
